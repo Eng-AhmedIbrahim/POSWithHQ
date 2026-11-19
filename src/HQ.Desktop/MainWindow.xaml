@@ -6,14 +6,15 @@
         xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
         xmlns:local="clr-namespace:HQ.Desktop"
         mc:Ignorable="d"
-        Title="HQ - Headquarters"
+        Title="New Tech - Headquarters (HQ)"
+        Icon="NewTechHQ.ico"
         Height="900"
         Width="1600"
         WindowStartupLocation="CenterScreen"
         WindowState="Maximized"
         WindowStyle="None"
         ResizeMode="CanResize"
-        Background="#F7F1DE">
+        Background="#0F0A02">
     <Grid>
         <blazor:BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
             <blazor:BlazorWebView.RootComponents>

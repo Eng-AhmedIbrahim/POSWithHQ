@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   HQ Desktop — Login Page Styles | Warehouse Gold Gradient Theme
+   HQ Desktop — Login Page Styles | Ultra-Luxury Gold Edition
    ══════════════════════════════════════════════════════════════════ */
 
 .login-page {
@@ -9,42 +9,45 @@
     width: 100vw;
     font-family: 'Tajawal', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     overflow: hidden;
-    direction: ltr; /* Keeps Brand on LEFT and Login on RIGHT like Warehouse */
+    direction: ltr; /* Keeps Brand on LEFT and Login on RIGHT */
 }
 
-/* ─── Left Brand Section - Gold Shimmer to Dark Brown Gradient ─── */
+/* ─── Left Brand Section - Textured Metallic Gold Mesh ─────────── */
 .brand-section {
-    flex: 1.2;
+    flex: 1.25;
     background:
-        radial-gradient(ellipse at 30% 25%, rgba(245, 208, 97, 0.22) 0%, transparent 55%),
-        radial-gradient(circle at 80% 75%, rgba(201, 151, 24, 0.18) 0%, transparent 45%),
+        radial-gradient(ellipse at 25% 20%, rgba(255, 230, 140, 0.28) 0%, transparent 45%),
+        radial-gradient(circle at 75% 70%, rgba(212, 160, 23, 0.22) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.08) 0%, transparent 60%),
         linear-gradient(135deg,
-            #0b0701 0%,
-            #1e1402 22%,
-            #3b2604 45%,
-            #5e3f08 68%,
-            #946908 86%,
-            #c99718 100%);
+            #080501 0%,
+            #150d02 18%,
+            #291a03 36%,
+            #472f06 54%,
+            #704d09 72%,
+            #a67812 88%,
+            #d4a017 100%);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     color: white;
     position: relative;
-    box-shadow: 6px 0 30px rgba(0, 0, 0, 0.45);
+    box-shadow: 8px 0 35px rgba(0, 0, 0, 0.55);
     z-index: 2;
+    overflow: hidden;
 }
 
-/* Close App Button — Top-Left like Warehouse */
+/* Close App Button — Top-Left */
 .close-app-btn {
     position: absolute;
     top: 25px;
     left: 25px;
     background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(245, 208, 97, 0.35);
+    border: 1px solid rgba(245, 208, 97, 0.4);
     color: #fce89f;
-    width: 45px;
-    height: 45px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
@@ -53,77 +56,84 @@
     font-size: 1.2rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(8px);
+    z-index: 10;
 }
 
 .close-app-btn:hover {
     background: #e53935;
     color: white;
     transform: rotate(90deg);
-    box-shadow: 0 0 16px rgba(229, 57, 53, 0.55);
+    box-shadow: 0 0 18px rgba(229, 57, 53, 0.6);
     border-color: #e53935;
 }
 
-/* Brand Content & Typography */
+/* Brand Content Container */
 .brand-content {
     text-align: center;
-    animation: fadeIn 0.8s ease-out;
-    padding: 0 2rem;
+    animation: fadeInContent 0.8s ease-out;
+    padding: 0 2.5rem;
+    position: relative;
+    z-index: 3;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(16px); }
+@keyframes fadeInContent {
+    from { opacity: 0; transform: translateY(20px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Brand Logo Badge */
+/* Brand Logo Frame with User's Official "N" Logo */
 .brand-logo-container {
     position: relative;
-    width: 170px;
-    height: 170px;
-    margin: 0 auto 2rem;
+    margin: 0 auto 1.8rem;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.brand-logo-glow {
+.brand-logo-shimmer {
     position: absolute;
-    inset: -12px;
-    background: radial-gradient(circle, rgba(245, 208, 97, 0.35) 0%, transparent 70%);
-    border-radius: 46px;
-    filter: blur(8px);
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(255, 225, 120, 0.32) 0%, transparent 70%);
+    border-radius: 50%;
+    filter: blur(14px);
     z-index: 1;
+    animation: pulseGlow 4s ease-in-out infinite alternate;
+}
+
+@keyframes pulseGlow {
+    from { transform: scale(0.95); opacity: 0.7; }
+    to   { transform: scale(1.1);  opacity: 1;   }
+}
+
+.brand-logo-frame {
+    position: relative;
+    z-index: 2;
+    padding: 14px;
+    border-radius: 36px;
+    background: linear-gradient(145deg, rgba(30, 20, 3, 0.85) 0%, rgba(15, 10, 2, 0.95) 100%);
+    border: 2px solid rgba(245, 208, 97, 0.55);
+    box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.65),
+        inset 0 0 24px rgba(212, 160, 23, 0.2);
+    backdrop-filter: blur(10px);
 }
 
 .brand-logo {
-    position: relative;
-    z-index: 2;
-    width: 155px;
-    height: 155px;
-    border-radius: 38px;
-    background: linear-gradient(160deg, #1c1404 0%, #2b1d06 60%, #150e02 100%);
-    border: 2px solid rgba(245, 208, 97, 0.6);
-    box-shadow:
-        0 14px 34px rgba(0, 0, 0, 0.55),
-        inset 0 0 20px rgba(201, 151, 24, 0.22);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 18px;
-}
-
-.hq-emblem-svg {
-    width: 100%;
-    height: 100%;
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+    width: 175px;
+    height: auto;
+    max-height: 175px;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
 }
 
 .brand-title {
     font-size: 3.4rem;
-    font-weight: 800;
+    font-weight: 900;
     margin: 0;
     letter-spacing: 1px;
-    background: linear-gradient(to right, #ffffff 0%, #fff1c2 50%, #f5d061 100%);
+    background: linear-gradient(to right, #ffffff 0%, #fff4cf 35%, #f5d061 70%, #d4a017 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -131,53 +141,104 @@
 
 .brand-subtitle {
     font-size: 1.05rem;
-    font-weight: 500;
-    margin-top: 0.5rem;
-    color: #f5d061;
-    letter-spacing: 3px;
+    font-weight: 600;
+    margin-top: 0.4rem;
+    margin-bottom: 1.2rem;
+    color: #f7d66f;
+    letter-spacing: 3.5px;
     text-transform: uppercase;
+}
+
+.gold-accent-line {
+    width: 80px;
+    height: 2.5px;
+    margin: 0 auto 1.2rem;
+    background: linear-gradient(to right, transparent, #f5d061, transparent);
+    border-radius: 2px;
+}
+
+.brand-tagline {
+    font-size: 1rem;
+    color: rgba(255, 238, 180, 0.75);
+    margin: 0;
+    font-weight: 500;
 }
 
 /* ─── Right Login Section ───────────────────────────────────────── */
 .login-section {
-    flex: 1.2;
-    background-color: #ffffff;
+    flex: 1.15;
+    background: #ffffff;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 2rem;
+    padding: 2.5rem;
     position: relative;
     direction: rtl; /* Form contents are Arabic RTL */
 }
 
 .login-card {
     width: 100%;
-    max-width: 400px;
+    max-width: 410px;
+}
+
+/* Login Header with App Icon Badge */
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.app-icon-badge {
+    width: 62px;
+    height: 62px;
+    border-radius: 20px;
+    margin: 0 auto 1rem;
+    background: linear-gradient(145deg, #1f1402 0%, #3a2705 60%, #150d01 100%);
+    border: 2px solid rgba(212, 160, 23, 0.6);
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.22),
+        0 0 14px rgba(212, 160, 23, 0.25);
+    display: grid;
+    place-items: center;
+    transition: transform 0.3s ease;
+}
+
+.app-icon-badge:hover {
+    transform: scale(1.06);
+}
+
+.hq-ico-img {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
 }
 
 .login-header h2 {
-    font-size: 2rem;
-    font-weight: 800;
+    font-size: 2.1rem;
+    font-weight: 900;
     color: #2b1d06;
-    margin-bottom: 2rem;
-    text-align: center;
-    letter-spacing: 0.5px;
+    margin: 0 0 0.3rem;
+}
+
+.login-hint {
+    font-size: 0.92rem;
+    color: #8c7348;
+    margin: 0;
 }
 
 /* ─── Form Controls ─────────────────────────────────────────────── */
 .form-group {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.4rem;
 }
 
 .form-control-custom {
     width: 100%;
     padding: 15px 20px;
-    font-size: 1.2rem;
-    border: 2px solid #ecdba8;
-    border-radius: 12px;
-    background-color: #fff;
-    transition: all 0.3s ease;
+    font-size: 1.15rem;
+    border: 2px solid #e8d9a2;
+    border-radius: 14px;
+    background-color: #fffdf9;
+    transition: all 0.25s ease;
     outline: none;
     color: #2b1d06;
     box-sizing: border-box;
@@ -193,28 +254,29 @@
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c99718' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
     background-repeat: no-repeat;
     background-position: left 1rem center;
-    background-size: 1em;
+    background-size: 1.1em;
 }
 
 .form-control-custom:focus {
     border-color: #c99718;
-    box-shadow: 0 0 0 4px rgba(201, 151, 24, 0.18);
+    box-shadow: 0 0 0 4px rgba(201, 151, 24, 0.2);
+    background-color: #ffffff;
 }
 
 .otp-display {
     text-align: center;
     letter-spacing: 12px;
-    font-weight: 700;
-    font-size: 1.6rem;
-    background-color: #fffdf5;
-    border-color: #ecdba8;
+    font-weight: 800;
+    font-size: 1.5rem;
+    background: linear-gradient(135deg, #fffcf2 0%, #fff8e1 100%);
+    border-color: #e2ce8a;
     color: #2b1d06;
 }
 
-/* ─── Keypad (Circle 85px Buttons matching Warehouse) ─────────────── */
+/* ─── Keypad Grid ───────────────────────────────────────────────── */
 .keypad-container {
-    margin-top: 2rem;
-    direction: ltr; /* Keeps [1,2,3] order matching Warehouse */
+    margin-top: 1.8rem;
+    direction: ltr; /* Keeps [1,2,3] order matching Warehouse & BackOffice */
 }
 
 .keypad-grid {
@@ -231,40 +293,41 @@
     align-items: center;
     justify-content: center;
     font-size: 2rem;
-    font-weight: 600;
+    font-weight: 700;
     color: #2b1d06;
-    background-color: #fff;
-    border: 1px solid #ecdba8;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    background: #ffffff;
+    border: 1.5px solid #ebdca8;
+    box-shadow: 0 4px 10px rgba(160, 120, 10, 0.08);
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     margin: 0 auto;
     font-family: inherit;
     user-select: none;
 }
 
 .keypad-btn:hover {
-    background-color: #fffbee;
+    background: #fffbee;
     border-color: #c99718;
     transform: translateY(-2px);
-    box-shadow: 0 8px 14px -1px rgba(201, 151, 24, 0.18);
-    color: #8a6104;
+    box-shadow: 0 8px 18px rgba(201, 151, 24, 0.22);
+    color: #855e04;
 }
 
 .keypad-btn:active {
     transform: translateY(1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
 }
 
 .keypad-btn.action-btn.del {
     color: #ef4444;
     font-size: 1.8rem;
-    font-weight: bold;
+    font-weight: 800;
 }
 
 .keypad-btn.action-btn.del:hover {
-    background-color: #fef2f2;
+    background: #fef2f2;
     border-color: #ef4444;
+    box-shadow: 0 6px 14px rgba(239, 68, 68, 0.2);
 }
 
 .keypad-btn.action-btn.bs {
@@ -273,7 +336,7 @@
 }
 
 .keypad-btn.action-btn.bs:hover {
-    background-color: #fff9e6;
+    background: #fff8e6;
     border-color: #c99718;
 }
 
@@ -281,46 +344,51 @@
 .action-buttons {
     display: flex;
     gap: 15px;
-    margin-top: 2rem;
-    direction: ltr; /* Keeps [Login, Exit] order matching Warehouse */
+    margin-top: 1.8rem;
+    direction: ltr; /* Keeps [Login, Exit] order */
 }
 
 .btn-custom {
     flex: 1;
     padding: 15px;
-    border-radius: 12px;
+    border-radius: 14px;
     font-size: 1.2rem;
-    font-weight: 700;
+    font-weight: 800;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: center;
     border: none;
     font-family: inherit;
 }
 
 .btn-primary-custom {
-    background: linear-gradient(135deg, #a77b0c 0%, #c99718 50%, #e0ad24 100%);
+    background: linear-gradient(135deg, #a77b0c 0%, #c99718 45%, #e6b329 100%);
     color: white;
-    box-shadow: 0 4px 14px rgba(201, 151, 24, 0.38);
+    box-shadow: 0 6px 20px rgba(201, 151, 24, 0.42);
 }
 
-.btn-primary-custom:hover {
-    background: linear-gradient(135deg, #8f6808 0%, #b8860b 50%, #d4a017 100%);
+.btn-primary-custom:hover:not(:disabled) {
+    background: linear-gradient(135deg, #8f6808 0%, #b8860b 45%, #d4a017 100%);
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(201, 151, 24, 0.45);
+    box-shadow: 0 10px 28px rgba(201, 151, 24, 0.52);
 }
 
-.btn-primary-custom:active {
+.btn-primary-custom:active:not(:disabled) {
     transform: translateY(0);
 }
 
+.btn-primary-custom:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
 .btn-danger-custom {
-    background: transparent;
+    background: #ffffff;
     color: #2b1d06;
-    border: 1px solid #ecdba8;
+    border: 1.5px solid #e8d9a2;
 }
 
 .btn-danger-custom:hover {
-    background-color: #fffbee;
+    background: #fffbee;
     border-color: #c99718;
 }

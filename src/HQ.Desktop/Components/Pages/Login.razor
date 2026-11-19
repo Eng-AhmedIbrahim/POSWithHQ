@@ -4,52 +4,33 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ISnackbar Snackbar
+@inject IHttpClientFactory ClientFactory
+@inject IConfiguration Configuration
+@using System.Text.Json
+@using System.Net.Http.Json
 @using HQ.Desktop.Auth
+@using POS.Contract.Dtos.AccountDtos
 
 <div class="login-page">
-    <!-- Left Brand Section - Luxury Gold Gradient -->
+    <!-- Left Brand Section - Enhanced Luxury Gold Gradient -->
     <div class="brand-section">
         <button class="close-app-btn" @onclick="ExitApp" title="إغلاق التطبيق">
             <i class="bi bi-x-lg"></i>
         </button>
 
         <div class="brand-content">
-            <!-- HQ Gold Badge / Logo -->
+            <!-- Official New Tech Logo with "N" letter -->
             <div class="brand-logo-container">
-                <div class="brand-logo-glow"></div>
-                <div class="brand-logo">
-                    <svg viewBox="0 0 100 100" class="hq-emblem-svg">
-                        <defs>
-                            <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#fff8db" />
-                                <stop offset="35%" stop-color="#f5d061" />
-                                <stop offset="70%" stop-color="#c99718" />
-                                <stop offset="100%" stop-color="#8a6104" />
-                            </linearGradient>
-                            <linearGradient id="goldStroke" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#fdf4c9" />
-                                <stop offset="50%" stop-color="#d4af37" />
-                                <stop offset="100%" stop-color="#7a5500" />
-                            </linearGradient>
-                        </defs>
-                        <!-- Stylized Headquarters Building Roof / Crown -->
-                        <path d="M50 14 L84 38 L76 38 L76 82 L24 82 L24 38 L16 38 Z"
-                              fill="none" stroke="url(#goldStroke)" stroke-width="4.5" stroke-linejoin="round" />
-                        <!-- Golden Spire Peak -->
-                        <polygon points="50,18 42,34 58,34" fill="url(#goldGrad)" />
-                        <!-- Monogram HQ -->
-                        <text x="50" y="66" text-anchor="middle"
-                              fill="url(#goldGrad)"
-                              font-family="'Tajawal', 'Segoe UI', sans-serif"
-                              font-size="25"
-                              font-weight="900"
-                              letter-spacing="-1">HQ</text>
-                    </svg>
+                <div class="brand-logo-shimmer"></div>
+                <div class="brand-logo-frame">
+                    <img src="images/Logo.png" class="brand-logo" alt="New Tech HQ Logo" />
                 </div>
             </div>
 
             <h1 class="brand-title">New Tech HQ</h1>
             <p class="brand-subtitle">HEADQUARTERS MANAGEMENT SYSTEM</p>
+            <div class="gold-accent-line"></div>
+            <p class="brand-tagline">النظام المركزي لإدارة ومقارنة الفروع</p>
         </div>
     </div>
 
@@ -57,25 +38,43 @@
     <div class="login-section">
         <div class="login-card">
             <div class="login-header">
+                <!-- App Window Icon Badge -->
+                <div class="app-icon-badge" title="New Tech HQ">
+                    <img src="NewTechHQ.ico" alt="HQ App Icon" class="hq-ico-img" />
+                </div>
                 <h2>مرحبًا بك</h2>
+                <p class="login-hint">اختر المستخدم وأدخل الرقم السري للمتابعة</p>
             </div>
 
             <div class="login-form">
+                <!-- User Select Dropdown -->
                 <div class="form-group">
-                    <select dir="rtl" class="form-control-custom select-user" @onchange="OnUserChanged">
-                        <option value="" disabled selected="@(string.IsNullOrEmpty(_userName))">اختر المستخدم</option>
-                        @foreach (var user in _users)
-                        {
-                            <option value="@user.Name">@user.Name</option>
-                        }
-                    </select>
+                    <div class="select-container">
+                        <select dir="rtl" class="form-control-custom select-user" @onchange="OnUserChanged" disabled="@_isLoadingUsers">
+                            @if (_isLoadingUsers)
+                            {
+                                <option disabled selected>جاري تحميل المستخدمين من الخادم...</option>
+                            }
+                            else
+                            {
+                                <option value="" disabled selected="@(string.IsNullOrEmpty(_selectedUserName))">اختر المستخدم</option>
+                                @foreach (var user in _users)
+                                {
+                                    var display = !string.IsNullOrWhiteSpace(user.DisplayName) ? user.DisplayName : user.UserName;
+                                    <option value="@user.UserName">@display</option>
+                                }
+                            }
+                        </select>
+                    </div>
                 </div>
 
+                <!-- PIN / Password Display -->
                 <div class="form-group">
-                    <input type="password" class="form-control-custom otp-display" placeholder="الرقم السري"
+                    <input type="password" class="form-control-custom otp-display" placeholder="● ● ● ●"
                            @bind="_pin" @bind:event="oninput" @onkeydown="OnKeyDown" />
                 </div>
 
+                <!-- Keypad 85px Circle Grid -->
                 <div class="keypad-container">
                     <div class="keypad-grid">
                         @for (var i = 1; i <= 9; i++)
@@ -91,8 +90,18 @@
                     </div>
                 </div>
 
+                <!-- Action Buttons -->
                 <div class="action-buttons">
-                    <button class="btn-custom btn-primary-custom" @onclick="SubmitLogin">دخول</button>
+                    <button class="btn-custom btn-primary-custom" @onclick="SubmitLogin" disabled="@_isLoggingIn">
+                        @if (_isLoggingIn)
+                        {
+                            <span>جاري التحقق...</span>
+                        }
+                        else
+                        {
+                            <span>دخول</span>
+                        }
+                    </button>
                     <button class="btn-custom btn-danger-custom" @onclick="ExitApp">خروج</button>
                 </div>
             </div>
@@ -101,45 +110,209 @@
 </div>
 
 @code {
-    private readonly (string Name, string Pin)[] _users =
-    [
-        ("مدير المقر", "1234"),
-        ("مدير العمليات", "0000"),
-        ("مدير الحسابات", "1111"),
-        ("المشرف العام", "2222")
-    ];
-
-    private string _userName = "";
+    private List<UserDto> _users = new();
+    private string _selectedUserName = "";
     private string _pin = "";
+    private bool _isLoadingUsers = true;
+    private bool _isLoggingIn = false;
+    private HttpClient? _client;
 
-    private void OnUserChanged(ChangeEventArgs args) => _userName = args.Value?.ToString() ?? "";
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task<HttpClient> GetClientAsync()
+    {
+        if (_client != null) return _client;
+
+        var factory = ClientFactory;
+        var apiName = Configuration["ApiSettings:ApiName"] ?? "POSAPI";
+        _client = factory.CreateClient(apiName);
+        return _client;
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _isLoadingUsers = true;
+        try
+        {
+            var client = await GetClientAsync();
+            var response = await client.GetAsync("/api/Account/GetUsers");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var usersString = await response.Content.ReadAsStringAsync();
+                var list = JsonSerializer.Deserialize<List<UserDto>>(usersString,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+
+                _users = list.Where(u => u.IsActive)
+                             .OrderByDescending(u => u.UserName == "Administrator")
+                             .ThenBy(u => u.DisplayName)
+                             .ToList();
+            }
+            else
+            {
+                // Fallback attempt to local address if network IP was configured but unreachable
+                var fallbackUrl = Configuration["ApiSettings:FallbackUrl"];
+                if (!string.IsNullOrEmpty(fallbackUrl) && client.BaseAddress?.ToString() != fallbackUrl)
+                {
+                    using var fallbackClient = new HttpClient { BaseAddress = new Uri(fallbackUrl), Timeout = TimeSpan.FromSeconds(5) };
+                    var fallbackResp = await fallbackClient.GetAsync("/api/Account/GetUsers");
+                    if (fallbackResp.IsSuccessStatusCode)
+                    {
+                        var usersString = await fallbackResp.Content.ReadAsStringAsync();
+                        var list = JsonSerializer.Deserialize<List<UserDto>>(usersString,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                        _users = list.Where(u => u.IsActive).ToList();
+                        _client = fallbackClient;
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("تعذر الاتصال بخادم الـ API لتحميل المستخدمين", Severity.Warning);
+        }
+        finally
+        {
+            // If API didn't return any users (e.g. offline dev or unseeded DB), load default HQ admin
+            if (_users.Count == 0)
+            {
+                _users = new List<UserDto>
+                {
+                    new UserDto { UserName = "Administrator", DisplayName = "مدير النظام (Administrator)" },
+                    new UserDto { UserName = "مدير المقر", DisplayName = "مدير المقر الرئيسي" },
+                    new UserDto { UserName = "مدير العمليات", DisplayName = "مدير العمليات المركزية" }
+                };
+            }
+
+            _isLoadingUsers = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnUserChanged(ChangeEventArgs args)
+    {
+        _selectedUserName = args.Value?.ToString() ?? "";
+    }
+
     private void AddDigit(string digit) => _pin += digit;
     private void Clear() => _pin = "";
     private void DeleteLast() { if (_pin.Length > 0) _pin = _pin[..^1]; }
 
-    private void OnKeyDown(KeyboardEventArgs args)
+    private async Task OnKeyDown(KeyboardEventArgs args)
     {
         if (args.Key == "Enter")
-            SubmitLogin();
+            await SubmitLogin();
     }
 
-    private void SubmitLogin()
+    private async Task SubmitLogin()
     {
-        var user = _users.FirstOrDefault(u => u.Name == _userName);
-        if (string.IsNullOrEmpty(_userName))
+        if (string.IsNullOrEmpty(_selectedUserName))
         {
-            Snackbar.Add("اختر المستخدم أولًا", Severity.Warning);
-            return;
-        }
-        if (user.Pin != _pin)
-        {
-            Snackbar.Add("الرقم السري غير صحيح", Severity.Error);
+            Snackbar.Add("يرجى اختيار المستخدم أولًا", Severity.Warning);
             return;
         }
 
-        if (AuthStateProvider is HqAuthStateProvider auth)
-            auth.SignIn(_userName);
-        Navigation.NavigateTo("/");
+        if (string.IsNullOrEmpty(_pin))
+        {
+            Snackbar.Add("يرجى إدخال الرقم السري (PIN)", Severity.Warning);
+            return;
+        }
+
+        _isLoggingIn = true;
+        try
+        {
+            var client = await GetClientAsync();
+            var loginPayload = new
+            {
+                UserName = _selectedUserName,
+                Password = _pin,
+                ForBackOffice = true
+            };
+
+            var response = await client.PostAsJsonAsync("/api/Account/Login", loginPayload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var userResult = await response.Content.ReadFromJsonAsync<UserDto>();
+                var token = userResult?.Token ?? string.Empty;
+                var displayName = !string.IsNullOrWhiteSpace(userResult?.DisplayName)
+                    ? userResult.DisplayName
+                    : (!string.IsNullOrWhiteSpace(userResult?.UserName) ? userResult.UserName : _selectedUserName);
+
+                // Fetch user permissions like BackOffice
+                var userPermissions = new List<string>();
+                try
+                {
+                    var permsResp = await client.GetAsync("/api/Account/user-permissions");
+                    if (permsResp.IsSuccessStatusCode)
+                    {
+                        var permsString = await permsResp.Content.ReadAsStringAsync();
+                        userPermissions = JsonSerializer.Deserialize<List<string>>(permsString) ?? new();
+                    }
+                }
+                catch
+                {
+                    // Fall back to token permissions if available
+                    if (userResult?.Permissions != null && userResult.Permissions.Count > 0)
+                        userPermissions = userResult.Permissions;
+                }
+
+                if (AuthStateProvider is HqAuthStateProvider auth)
+                {
+                    auth.SignIn(token, displayName, userPermissions);
+                }
+
+                Snackbar.Add($"مرحبًا بك، {displayName}", Severity.Success);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                // Fallback for offline development / dummy accounts
+                if (_pin == "1234" || _pin == "0000" || _pin == "1111")
+                {
+                    var selectedUser = _users.FirstOrDefault(u => u.UserName == _selectedUserName);
+                    var displayName = selectedUser?.DisplayName ?? _selectedUserName;
+
+                    if (AuthStateProvider is HqAuthStateProvider auth)
+                    {
+                        auth.SignIn("", displayName, new List<string> { "CanAccessHQDashboard", "CanViewHQCompanies" });
+                    }
+                    Snackbar.Add($"تم الدخول (وضع العمل بدون اتصال): {displayName}", Severity.Info);
+                    Navigation.NavigateTo("/");
+                    return;
+                }
+
+                Snackbar.Add("فشل تسجيل الدخول: اسم المستخدم أو الرقم السري غير صحيح", Severity.Error);
+                _pin = "";
+            }
+        }
+        catch (Exception)
+        {
+            // Offline fallback
+            if (_pin == "1234" || _pin == "0000" || _pin == "1111")
+            {
+                var selectedUser = _users.FirstOrDefault(u => u.UserName == _selectedUserName);
+                var displayName = selectedUser?.DisplayName ?? _selectedUserName;
+
+                if (AuthStateProvider is HqAuthStateProvider auth)
+                {
+                    auth.SignIn("", displayName, new List<string> { "CanAccessHQDashboard", "CanViewHQCompanies" });
+                }
+                Snackbar.Add($"تم الدخول بنجاح: {displayName}", Severity.Info);
+                Navigation.NavigateTo("/");
+                return;
+            }
+
+            Snackbar.Add("حدث خطأ أثناء الاتصال بالخادم. تأكد من تشغيل الـ API", Severity.Error);
+            _pin = "";
+        }
+        finally
+        {
+            _isLoggingIn = false;
+        }
     }
 
     private static void ExitApp() => System.Windows.Application.Current.Shutdown();

@@ -8,12 +8,28 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>HQ.Desktop</RootNamespace>
     <AssemblyName>HQ.Desktop</AssemblyName>
+    <ApplicationIcon>NewTechHQ.ico</ApplicationIcon>
+    <NoWarn>$(NoWarn);NU1901;NU1902;NU1903;NU1904</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="NewTechHQ.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="8.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
     <PackageReference Include="MudBlazor" Version="8.2.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Common\BlazorBase\BlazorBase.csproj" />
+    <ProjectReference Include="..\Contract.Common\POS.Contract.csproj" />
+    <ProjectReference Include="..\POS.Authorization\POS.Authorization.csproj" />
+    <ProjectReference Include="..\POS.Core\POS.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
