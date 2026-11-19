@@ -1,4 +1,4 @@
-using POS.API.Hubs;
+﻿using POS.API.Hubs;
 QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -84,6 +84,14 @@ try
     await dbContext.Database.MigrateAsync();
     await identityDbContext.Database.MigrateAsync();
 
+    await identityDbContext.Database.ExecuteSqlRawAsync(@"
+        IF COL_LENGTH('Permissions', 'IsWarehouse') IS NULL
+            ALTER TABLE Permissions ADD IsWarehouse bit NOT NULL DEFAULT 0;
+
+        IF COL_LENGTH('Permissions', 'IsHQ') IS NULL
+            ALTER TABLE Permissions ADD IsHQ bit NOT NULL DEFAULT 0;
+    ");
+
     // Hotfix: Ensure Warehouse schema is always complete across all databases (PointOfSaleDB, PointOfSaleDBb, etc.)
     await dbContext.Database.ExecuteSqlRawAsync(@"
         IF COL_LENGTH('Warehouses', 'ApiUrl') IS NULL
@@ -165,6 +173,14 @@ try
         -- 5. Add IsBackOffice if missing
         IF COL_LENGTH('Permissions', 'IsBackOffice') IS NULL
             ALTER TABLE Permissions ADD IsBackOffice bit NOT NULL DEFAULT 0;
+
+        -- 5b. Add IsWarehouse if missing
+        IF COL_LENGTH('Permissions', 'IsWarehouse') IS NULL
+            ALTER TABLE Permissions ADD IsWarehouse bit NOT NULL DEFAULT 0;
+
+        -- 5c. Add IsHQ if missing
+        IF COL_LENGTH('Permissions', 'IsHQ') IS NULL
+            ALTER TABLE Permissions ADD IsHQ bit NOT NULL DEFAULT 0;
 
         -- 6. Fallback: Add ScreenArabicName if still missing after rename
         IF COL_LENGTH('Permissions', 'ScreenArabicName') IS NULL

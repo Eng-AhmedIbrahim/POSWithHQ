@@ -265,6 +265,9 @@ namespace Pos.Repository.Migrations.AppIdentityDb
                     b.Property<bool>("IsWarehouse")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsHQ")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
