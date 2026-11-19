@@ -14,7 +14,7 @@
         WindowState="Maximized"
         WindowStyle="None"
         ResizeMode="CanResize"
-        Background="#0F0A02">
+        Background="#FAF6EC">
     <Grid>
         <blazor:BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
             <blazor:BlazorWebView.RootComponents>
