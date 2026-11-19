@@ -18,9 +18,14 @@
     </div>
 
     <nav class="side-links">
-        <button class="nav-link active" title="لوحة المقارنات" @onclick='() => Navigation.NavigateTo("/")'>
+        <button class="nav-link @(IsActive("/") ? "active" : "")" title="لوحة المقارنات" @onclick='() => Navigation.NavigateTo("/")'>
             <MudIcon Icon="@Icons.Material.Rounded.Dashboard" />
             <span>لوحة المقارنات</span>
+        </button>
+
+        <button class="nav-link @(IsActive("/settings") ? "active" : "")" title="إعدادات المقر" @onclick='() => Navigation.NavigateTo("/settings")'>
+            <MudIcon Icon="@Icons.Material.Rounded.Settings" />
+            <span>إعدادات المقر</span>
         </button>
     </nav>
 
@@ -50,6 +55,14 @@
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         _userName = state.User.Identity?.Name ?? "مدير المقر";
         _initials = _userName.Length >= 2 ? _userName[..2] : "HQ";
+    }
+
+    private bool IsActive(string path)
+    {
+        var uri = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (string.IsNullOrEmpty(uri))
+            return path == "/";
+        return ("/" + uri).Equals(path, StringComparison.OrdinalIgnoreCase);
     }
 
     private void Toggle() => _open = !_open;

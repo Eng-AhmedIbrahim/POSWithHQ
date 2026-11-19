@@ -1,155 +1,326 @@
+/* ══════════════════════════════════════════════════════════════════
+   HQ Desktop — Login Page Styles | Warehouse Gold Gradient Theme
+   ══════════════════════════════════════════════════════════════════ */
+
 .login-page {
     display: flex;
+    flex-direction: row;
     height: 100vh;
     width: 100vw;
+    font-family: 'Tajawal', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     overflow: hidden;
-    font-family: "Tajawal", "Segoe UI", sans-serif;
+    direction: ltr; /* Keeps Brand on LEFT and Login on RIGHT like Warehouse */
 }
 
+/* ─── Left Brand Section - Gold Shimmer to Dark Brown Gradient ─── */
 .brand-section {
     flex: 1.2;
-    background: linear-gradient(145deg, #1a1408 0%, #3d2e0a 48%, #c9a227 100%);
+    background:
+        radial-gradient(ellipse at 30% 25%, rgba(245, 208, 97, 0.22) 0%, transparent 55%),
+        radial-gradient(circle at 80% 75%, rgba(201, 151, 24, 0.18) 0%, transparent 45%),
+        linear-gradient(135deg,
+            #0b0701 0%,
+            #1e1402 22%,
+            #3b2604 45%,
+            #5e3f08 68%,
+            #946908 86%,
+            #c99718 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    position: relative;
+    box-shadow: 6px 0 30px rgba(0, 0, 0, 0.45);
+    z-index: 2;
+}
+
+/* Close App Button — Top-Left like Warehouse */
+.close-app-btn {
+    position: absolute;
+    top: 25px;
+    left: 25px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(245, 208, 97, 0.35);
+    color: #fce89f;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    position: relative;
+    font-size: 1.2rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
 }
 
-.brand-content { text-align: center; }
+.close-app-btn:hover {
+    background: #e53935;
+    color: white;
+    transform: rotate(90deg);
+    box-shadow: 0 0 16px rgba(229, 57, 53, 0.55);
+    border-color: #e53935;
+}
+
+/* Brand Content & Typography */
+.brand-content {
+    text-align: center;
+    animation: fadeIn 0.8s ease-out;
+    padding: 0 2rem;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Brand Logo Badge */
+.brand-logo-container {
+    position: relative;
+    width: 170px;
+    height: 170px;
+    margin: 0 auto 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brand-logo-glow {
+    position: absolute;
+    inset: -12px;
+    background: radial-gradient(circle, rgba(245, 208, 97, 0.35) 0%, transparent 70%);
+    border-radius: 46px;
+    filter: blur(8px);
+    z-index: 1;
+}
 
 .brand-logo {
-    width: 150px;
-    height: 150px;
-    margin: 0 auto 1.4rem;
-    border-radius: 40px;
-    display: grid;
-    place-items: center;
-    font-size: 3rem;
-    font-weight: 800;
-    color: #1c1408;
-    background: linear-gradient(160deg, #fff4cc, #e8c872 45%, #c9a227);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    position: relative;
+    z-index: 2;
+    width: 155px;
+    height: 155px;
+    border-radius: 38px;
+    background: linear-gradient(160deg, #1c1404 0%, #2b1d06 60%, #150e02 100%);
+    border: 2px solid rgba(245, 208, 97, 0.6);
+    box-shadow:
+        0 14px 34px rgba(0, 0, 0, 0.55),
+        inset 0 0 20px rgba(201, 151, 24, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+}
+
+.hq-emblem-svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
 }
 
 .brand-title {
-    margin: 0;
     font-size: 3.4rem;
-    background: linear-gradient(to left, #fff8e7, #e8c872);
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: 1px;
+    background: linear-gradient(to right, #ffffff 0%, #fff1c2 50%, #f5d061 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
 .brand-subtitle {
-    margin-top: 0.4rem;
-    letter-spacing: 4px;
+    font-size: 1.05rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
+    color: #f5d061;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    color: #f6e7b2;
 }
 
-.close-app-btn {
-    position: absolute;
-    top: 24px;
-    left: 24px;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 248, 231, 0.3);
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
-    cursor: pointer;
-}
-
+/* ─── Right Login Section ───────────────────────────────────────── */
 .login-section {
-    flex: 1.1;
-    background: #fffdf8;
+    flex: 1.2;
+    background-color: #ffffff;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    position: relative;
+    direction: rtl; /* Form contents are Arabic RTL */
 }
 
-.login-card { width: min(420px, 92%); }
-.login-header h2 { text-align: center; color: #1c1408; margin-bottom: 1.6rem; }
-.form-group { margin-bottom: 1rem; }
+.login-card {
+    width: 100%;
+    max-width: 400px;
+}
+
+.login-header h2 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #2b1d06;
+    margin-bottom: 2rem;
+    text-align: center;
+    letter-spacing: 0.5px;
+}
+
+/* ─── Form Controls ─────────────────────────────────────────────── */
+.form-group {
+    margin-bottom: 1.5rem;
+}
 
 .form-control-custom {
     width: 100%;
-    padding: 14px 18px;
-    font-size: 1.15rem;
-    border: 2px solid #ead9a4;
+    padding: 15px 20px;
+    font-size: 1.2rem;
+    border: 2px solid #ecdba8;
     border-radius: 12px;
+    background-color: #fff;
+    transition: all 0.3s ease;
     outline: none;
-    background: white;
+    color: #2b1d06;
     box-sizing: border-box;
-}
-
-.form-control-custom:focus {
-    border-color: #c9a227;
-    box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.18);
+    font-family: inherit;
 }
 
 .select-user {
+    font-size: 1.35rem;
     font-weight: 700;
+    cursor: pointer;
     appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c99718' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: left 1rem center;
+    background-size: 1em;
+}
+
+.form-control-custom:focus {
+    border-color: #c99718;
+    box-shadow: 0 0 0 4px rgba(201, 151, 24, 0.18);
 }
 
 .otp-display {
     text-align: center;
-    letter-spacing: 10px;
-    font-weight: 800;
-    background: #fff6df;
+    letter-spacing: 12px;
+    font-weight: 700;
+    font-size: 1.6rem;
+    background-color: #fffdf5;
+    border-color: #ecdba8;
+    color: #2b1d06;
+}
+
+/* ─── Keypad (Circle 85px Buttons matching Warehouse) ─────────────── */
+.keypad-container {
+    margin-top: 2rem;
+    direction: ltr; /* Keeps [1,2,3] order matching Warehouse */
 }
 
 .keypad-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-top: 1.4rem;
+    gap: 15px;
 }
 
 .keypad-btn {
-    height: 78px;
+    height: 85px;
+    width: 85px;
     border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: 1.6rem;
-    font-weight: 700;
-    background: white;
-    border: 2px solid #f3e6c0;
-    color: #1c1408;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 600;
+    color: #2b1d06;
+    background-color: #fff;
+    border: 1px solid #ecdba8;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(138, 106, 18, 0.06);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: 0 auto;
+    font-family: inherit;
+    user-select: none;
 }
 
-.keypad-btn:hover { border-color: #c9a227; color: #8a6a12; }
-.keypad-btn.del { color: #9f1239; background: #fff5f5; }
-.keypad-btn.bs { color: #b45309; background: #fff7ed; }
+.keypad-btn:hover {
+    background-color: #fffbee;
+    border-color: #c99718;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 14px -1px rgba(201, 151, 24, 0.18);
+    color: #8a6104;
+}
 
+.keypad-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.keypad-btn.action-btn.del {
+    color: #ef4444;
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.keypad-btn.action-btn.del:hover {
+    background-color: #fef2f2;
+    border-color: #ef4444;
+}
+
+.keypad-btn.action-btn.bs {
+    color: #8a6104;
+    font-size: 1.6rem;
+}
+
+.keypad-btn.action-btn.bs:hover {
+    background-color: #fff9e6;
+    border-color: #c99718;
+}
+
+/* ─── Action Buttons ─────────────────────────────────────────────── */
 .action-buttons {
-    margin-top: 1.6rem;
     display: flex;
-    gap: 12px;
+    gap: 15px;
+    margin-top: 2rem;
+    direction: ltr; /* Keeps [Login, Exit] order matching Warehouse */
 }
 
 .btn-custom {
     flex: 1;
-    border: 0;
+    padding: 15px;
     border-radius: 12px;
-    padding: 14px;
-    font-weight: 800;
+    font-size: 1.2rem;
+    font-weight: 700;
     cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    border: none;
     font-family: inherit;
 }
 
 .btn-primary-custom {
-    color: #1c1408;
-    background: linear-gradient(135deg, #f6e7b2, #c9a227);
-    box-shadow: 0 8px 18px rgba(201, 162, 39, 0.35);
+    background: linear-gradient(135deg, #a77b0c 0%, #c99718 50%, #e0ad24 100%);
+    color: white;
+    box-shadow: 0 4px 14px rgba(201, 151, 24, 0.38);
+}
+
+.btn-primary-custom:hover {
+    background: linear-gradient(135deg, #8f6808 0%, #b8860b 50%, #d4a017 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(201, 151, 24, 0.45);
+}
+
+.btn-primary-custom:active {
+    transform: translateY(0);
 }
 
 .btn-danger-custom {
-    background: #fffdf8;
-    color: #1c1408;
-    border: 2px solid #ead9a4;
+    background: transparent;
+    color: #2b1d06;
+    border: 1px solid #ecdba8;
+}
+
+.btn-danger-custom:hover {
+    background-color: #fffbee;
+    border-color: #c99718;
 }

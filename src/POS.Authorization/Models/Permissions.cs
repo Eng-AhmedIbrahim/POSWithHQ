@@ -1,10 +1,10 @@
-﻿namespace POS.Authorization.Models;
+namespace POS.Authorization.Models;
 
 public static class Permissions
 {
     public static readonly Dictionary<string, string> RolePermissions = new()
     {
-        // â”€â”€ Nav / Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Nav / Screens ─────────────────────────────────────────────────────
         { "CanAccessTables",       "CanAccessTables" },
         { "CanAccessDelivery",     "CanAccessDelivery" },
         { "CanAccessTakeAway",     "CanAccessTakeAway" },
@@ -14,7 +14,7 @@ public static class Permissions
         { "CanAccessDistribution", "CanAccessDistribution" },
         { "CanAccessWaiting",      "CanAccessWaiting" },
 
-        // â”€â”€ Section 3 â€“ Item Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Section 3 – Item Actions ──────────────────────────────────────────
         { "CanUseKeypad",          "CanUseKeypad" },
         { "CanIncrementQuantity",  "CanIncrementQuantity" },
         { "CanDecrementQuantity",  "CanDecrementQuantity" },
@@ -22,12 +22,12 @@ public static class Permissions
         { "CanApplyItemDiscount",  "CanApplyItemDiscount" },
         { "CanEditItemComment",    "CanEditItemComment" },
 
-        // â”€â”€ Section 4 â€“ Order Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Section 4 – Order Actions ─────────────────────────────────────────
         { "CanPrintOrder",    "CanPrintOrder" },
         { "CanWaitingOrder",  "CanWaitingOrder" },
         { "CanCancelOrder",   "CanCancelOrder" },
 
-        // â”€â”€ Footer Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Footer Buttons ────────────────────────────────────────────────────
         { "CanAccessFooterDiscountBtn",      "CanAccessFooterDiscountBtn" },
         { "CanAccessFooterCustomerDataBtn",  "CanAccessFooterCustomerDataBtn" },
         { "CanAccessFooterPaymentMethodBtn", "CanAccessFooterPaymentMethodBtn" },
@@ -37,7 +37,7 @@ public static class Permissions
         { "CanAccessFooterWaitingBtn",       "CanAccessFooterWaitingBtn" },
         { "CanAccessFooterSettingsBtn",      "CanAccessFooterSettingsBtn" },
 
-        // â”€â”€ DineIn Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── DineIn Buttons ────────────────────────────────────────────────────
         { "CanAccessDineInOrderBtn",       "CanAccessDineInOrderBtn" },
         { "CanAccessDineInReceiptBtn",     "CanAccessDineInReceiptBtn" },
         { "CanAccessDineInCloseTableBtn",  "CanAccessDineInCloseTableBtn" },
@@ -47,7 +47,7 @@ public static class Permissions
         { "CanAccessDineInVoidBtn",        "CanAccessDineInVoidBtn" },
         { "CanAccessDineInGuestCountBtn",  "CanAccessDineInGuestCountBtn" },
 
-        // â”€â”€ Delivery Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Delivery Buttons ──────────────────────────────────────────────────
         { "CanAccessDeliveryOrderBtn",              "CanAccessDeliveryOrderBtn" },
         { "CanAccessDeliveryAddNewBtn",             "CanAccessDeliveryAddNewBtn" },
         { "CanAccessDeliveryClearBtn",              "CanAccessDeliveryClearBtn" },
@@ -59,13 +59,13 @@ public static class Permissions
         { "CanAccessDeliveryVoidBtn",               "CanAccessDeliveryVoidBtn" },
         { "CanAccessDeliveryEditBtn",               "CanAccessDeliveryEditBtn" },
 
-        // â”€â”€ All Orders (Today) Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── All Orders (Today) Actions ────────────────────────────────────────
         { "CanViewOrderDetails",          "CanViewOrderDetails" },
         { "CanPrintOrderCustomerReceipt", "CanPrintOrderCustomerReceipt" },
         { "CanPrintOrderKitchenReceipt",  "CanPrintOrderKitchenReceipt" },
         { "CanVoidOrderFromList",         "CanVoidOrderFromList" },
 
-        // â”€â”€ Distribution Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Distribution Buttons ──────────────────────────────────────────────
         { "CanAccessDistributionAssignBtn",           "CanAccessDistributionAssignBtn" },
         { "CanAccessDistributionViewBtn",             "CanAccessDistributionViewBtn" },
         { "CanAccessDistributionVoidBtn",             "CanAccessDistributionVoidBtn" },
@@ -76,25 +76,25 @@ public static class Permissions
         { "CanAccessDistributionDriverSettlementBtn", "CanAccessDistributionDriverSettlementBtn" },
         { "CanAccessDistributionViewDriversBtn",      "CanAccessDistributionViewDriversBtn" },
 
-        // â”€â”€ Waiting Page Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Waiting Page Actions ──────────────────────────────────────────────
         { "CanCompleteWaitingOrder", "CanCompleteWaitingOrder" },
         { "CanRemoveWaitingOrder",   "CanRemoveWaitingOrder" },
 
-        // â”€â”€ Summary Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Summary Actions ───────────────────────────────────────────────────
         { "CanViewSummaryDetails", "CanViewSummaryDetails" },
         { "CanViewSalesItems", "CanViewSalesItems" },
         { "CanPrintSalesItems", "CanPrintSalesItems" },
         { "CanViewDetailedSales", "CanViewDetailedSales" },
         { "CanPrintSummaryReport", "CanPrintSummaryReport" },
 
-        // â”€â”€ Accounts Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Accounts Actions ──────────────────────────────────────────────────
         { "CanViewStaffAccounts",  "CanViewStaffAccounts" },
         { "CanPrintStaffAccounts", "CanPrintStaffAccounts" },
 
-        // â”€â”€ Global â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Global ────────────────────────────────────────────────────────────
         { "CanAccessPosSettingsFeature", "CanAccessPosSettingsFeature" },
 
-        // â”€â”€ BackOffice Screens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── BackOffice Screens ───────────────────────────────────────────────
         { "CanViewDashboardAtBackOffice", "CanViewDashboardAtBackOffice" },
         { "CanManageCompanySettingsAtBackOffice", "CanManageCompanySettingsAtBackOffice" },
         { "CanManageOrderSettingsAtBackOffice", "CanManageOrderSettingsAtBackOffice" },
@@ -143,7 +143,7 @@ public static class Permissions
         { "CanViewHospitalityReportAtBackOffice", "CanViewHospitalityReportAtBackOffice" },
         { "CanDeleteExpenseAtBackOffice", "CanDeleteExpenseAtBackOffice" },
 
-        // â”€â”€ Branch Delivery Orders Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Branch Delivery Orders Page ───────────────────────────────────────
         { "CanViewBranchDeliveryOrderDetails", "CanViewBranchDeliveryOrderDetails" },
         { "CanPrintBranchCustomerReceipt",     "CanPrintBranchCustomerReceipt" },
         { "CanPrintBranchDeliveryReceipt",     "CanPrintBranchDeliveryReceipt" },
@@ -176,5 +176,13 @@ public static class Permissions
         { "CanPostStockAdjustment",            "CanPostStockAdjustment" },
         { "CanViewStockValuationReport",       "CanViewStockValuationReport" },
         { "CanViewWarehouseReports",           "CanViewWarehouseReports" },
+        // Headquarters (HQ) System
+        { "CanAccessHQDashboard",              "CanAccessHQDashboard" },
+        { "CanViewHQCompanies",                "CanViewHQCompanies" },
+        { "CanViewHQBranches",                 "CanViewHQBranches" },
+        { "CanViewHQSalesAnalytics",           "CanViewHQSalesAnalytics" },
+        { "CanViewHQInventoryOverview",        "CanViewHQInventoryOverview" },
+        { "CanExportHQReports",                "CanExportHQReports" },
+        { "CanManageHQSettings",               "CanManageHQSettings" },
     };
 }

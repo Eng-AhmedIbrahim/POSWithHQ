@@ -1,4 +1,4 @@
-[
+﻿[
   {
     "Name": "CanPrintSummaryReport",
     "PoliceArabicName": "طباعة ملخص المبيعات",
@@ -1417,6 +1417,82 @@
     "ScreenEnglishName": "Warehouse Reports",
     "IsBackOffice": false,
     "IsWarehouse": true,
-    "Id": 142
+    "Id": 142  },
+  {
+    "Name": "CanAccessHQDashboard",
+    "PoliceArabicName": "الوصول للوحة تحكم المقر الرئيسي",
+    "PoliceEnglishNameEn": "Access HQ Dashboard",
+    "ScreenArabicName": "لوحة قيادة المقر",
+    "ScreenEnglishName": "HQ Dashboard",
+    "IsBackOffice": false,
+    "IsWarehouse": false,
+    "IsHQ": true,
+    "Id": 143
+  },
+  {
+    "Name": "CanViewHQCompanies",
+    "PoliceArabicName": "استعراض ومقارنة الشركات",
+    "PoliceEnglishNameEn": "View and Compare Companies",
+    "ScreenArabicName": "مؤشرات الشركات",
+    "ScreenEnglishName": "Company Analytics",
+    "IsBackOffice": false,
+    "IsWarehouse": false,
+    "IsHQ": true,
+    "Id": 144
+  },
+  {
+    "Name": "CanViewHQBranches",
+    "PoliceArabicName": "استعراض ومقارنة الفروع",
+    "PoliceEnglishNameEn": "View and Compare Branches",
+    "ScreenArabicName": "مؤشرات الفروع",
+    "ScreenEnglishName": "Branch Analytics",
+    "IsBackOffice": false,
+    "IsWarehouse": false,
+    "IsHQ": true,
+    "Id": 145
+  },
+  {
+    "Name": "CanViewHQSalesAnalytics",
+    "PoliceArabicName": "استعراض تحليلات المبيعات المركزية",
+    "PoliceEnglishNameEn": "View Consolidated Sales Analytics",
+    "ScreenArabicName": "تحليلات المبيعات",
+    "ScreenEnglishName": "Sales Analytics",
+    "IsBackOffice": false,
+    "IsWarehouse": false,
+    "IsHQ": true,
+    "Id": 146
+  },
+  {
+    "Name": "CanViewHQInventoryOverview",
+    "PoliceArabicName": "استعراض ومراقبة مخزون الفروع",
+    "PoliceEnglishNameEn": "View Network Inventory Overview",
+    "ScreenArabicName": "مراقبة المخزون",
+    "ScreenEnglishName": "Network Inventory",
+    "IsBackOffice": false,
+    "IsWarehouse": false,
+    "IsHQ": true,
+    "Id": 147
+  },
+  {
+    "Name": "CanExportHQReports",
+    "PoliceArabicName": "تصدير وطباعة تقارير المقر",
+    "PoliceEnglishNameEn": "Export HQ Reports",
+    "ScreenArabicName": "تقارير المقر",
+    "ScreenEnglishName": "HQ Reports",
+    "IsBackOffice": false,
+    "IsWarehouse": false,
+    "IsHQ": true,
+    "Id": 148
+  },
+  {
+    "Name": "CanManageHQSettings",
+    "PoliceArabicName": "إدارة إعدادات المقر والربط",
+    "PoliceEnglishNameEn": "Manage HQ Settings",
+    "ScreenArabicName": "إعدادات المقر",
+    "ScreenEnglishName": "HQ Settings",
+    "IsBackOffice": false,
+    "IsWarehouse": false,
+    "IsHQ": true,
+    "Id": 149
   }
 ]

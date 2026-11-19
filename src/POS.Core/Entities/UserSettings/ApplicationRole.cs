@@ -15,4 +15,5 @@ public class Permission
     public string ScreenEnglishName { get; set; } = string.Empty;
     public bool IsBackOffice { get; set; } = false;
     public bool IsWarehouse { get; set; } = false;
+    public bool IsHQ { get; set; } = false;
 }

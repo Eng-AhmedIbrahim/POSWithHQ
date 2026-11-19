@@ -1,0 +1,193 @@
+@page "/settings"
+@attribute [Authorize]
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<div class="hq-settings-container" dir="rtl">
+    <!-- Page Header with Gold Gradient Accent -->
+    <div class="settings-header">
+        <div class="header-icon-box">
+            <MudIcon Icon="@Icons.Material.Rounded.SettingsApplications" Size="Size.Large" Class="header-gold-icon" />
+        </div>
+        <div>
+            <h1 class="settings-title">إعدادات المقر الرئيسي</h1>
+            <p class="settings-subtitle">
+                تكوين الربط المركزي، فترات المزامنة، وتفضيلات عرض شاشات الـ HQ
+                <span class="device-pill">الجهاز: @Environment.MachineName</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="settings-grid">
+        <!-- Card 1: Cloud & API Central Connection (إعدادات الربط والاتصال) -->
+        <div class="gold-setting-card">
+            <div class="card-gold-header">
+                <MudIcon Icon="@Icons.Material.Rounded.CloudSync" Class="card-header-icon" />
+                <span class="card-title">إعدادات الاتصال والمزامنة المركزية</span>
+            </div>
+            <div class="card-body">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">رابط خادم المقر الرئيسي (HQ API Server)</label>
+                        <span class="setting-desc">عنوان الخادم المركزي لاستقبال بيانات الشركات والفروع</span>
+                    </div>
+                    <input type="text" class="gold-input" @bind="_serverUrl" placeholder="https://hq.newtech.pos/api" />
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">المزامنة الحية التلقائية (Real-Time Sync)</label>
+                        <span class="setting-desc">تحديث مؤشرات المبيعات ونقاط البيع تلقائيًا</span>
+                    </div>
+                    <label class="gold-toggle">
+                        <input type="checkbox" @bind="_autoSync" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                @if (_autoSync)
+                {
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <label class="setting-label">معدل تحديث البيانات (بالثواني)</label>
+                            <span class="setting-desc">الفترة الزمنية بين كل تحديث تلقائي للمؤشرات</span>
+                        </div>
+                        <div class="number-input-group">
+                            <input type="number" class="gold-input num-field" min="5" max="300" @bind="_syncIntervalSeconds" />
+                            <span class="unit-label">ثانية</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">تنبيهات انقطاع اتصال الفروع</label>
+                        <span class="setting-desc">إشعار فوري عند توقف أي فرع عن إرسال الفواتير لأكثر من 15 دقيقة</span>
+                    </div>
+                    <label class="gold-toggle">
+                        <input type="checkbox" @bind="_branchAlerts" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Analytics & Comparative Display (إعدادات لوحة المقارنات) -->
+        <div class="gold-setting-card">
+            <div class="card-gold-header">
+                <MudIcon Icon="@Icons.Material.Rounded.Insights" Class="card-header-icon" />
+                <span class="card-title">تخصيص لوحة المؤشرات والمقارنات</span>
+            </div>
+            <div class="card-body">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">العملة الافتراضية للتقارير الموحدة</label>
+                        <span class="setting-desc">العملة التي ستُعرض بها مجاميع ومبيعات كل الفروع</span>
+                    </div>
+                    <select class="gold-select" @bind="_defaultCurrency">
+                        <option value="EGP">جنيه مصري (EGP)</option>
+                        <option value="SAR">ريال سعودي (SAR)</option>
+                        <option value="AED">درهم إماراتي (AED)</option>
+                        <option value="USD">دولار أمريكي (USD)</option>
+                    </select>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">تضمين هوامش الربح التقديرية</label>
+                        <span class="setting-desc">إظهار بطاقات الربح الإجمالي بجانب إجمالي المبيعات</span>
+                    </div>
+                    <label class="gold-toggle">
+                        <input type="checkbox" @bind="_showProfitMargin" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">المقارنة التلقائية بالفترة السابقة</label>
+                        <span class="setting-desc">حساب نسبة النمو أو التراجع مقارنة بالأسبوع أو الشهر السابق</span>
+                    </div>
+                    <label class="gold-toggle">
+                        <input type="checkbox" @bind="_enableGrowthComparison" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Security & Session (الأمان والجلسات) -->
+        <div class="gold-setting-card">
+            <div class="card-gold-header">
+                <MudIcon Icon="@Icons.Material.Rounded.Security" Class="card-header-icon" />
+                <span class="card-title">الأمان وقفل الشاشة</span>
+            </div>
+            <div class="card-body">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">قفل الشاشة التلقائي عند الخمول</label>
+                        <span class="setting-desc">العودة لشاشة الدخول برقم PIN عند ترك المقر بدون تفاعل</span>
+                    </div>
+                    <label class="gold-toggle">
+                        <input type="checkbox" @bind="_autoLockEnabled" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                @if (_autoLockEnabled)
+                {
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <label class="setting-label">مدة الخمول قبل القفل (بالدقائق)</label>
+                            <span class="setting-desc">عدد الدقائق قبل قفل الشاشة</span>
+                        </div>
+                        <div class="number-input-group">
+                            <input type="number" class="gold-input num-field" min="1" max="120" @bind="_autoLockMinutes" />
+                            <span class="unit-label">دقيقة</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label class="setting-label">تسجيل نشاطات المدراء والعمليات (Audit Log)</label>
+                        <span class="setting-desc">حفظ سجل تفصيلي بجميع عمليات التصدير وتغيير الإعدادات</span>
+                    </div>
+                    <label class="gold-toggle">
+                        <input type="checkbox" @bind="_auditLogging" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Bar -->
+    <div class="settings-actions">
+        <button class="gold-save-btn" @onclick="SaveSettings">
+            <MudIcon Icon="@Icons.Material.Rounded.Save" Size="Size.Small" Class="ms-2" />
+            حفظ التغييرات
+        </button>
+        <button class="gold-cancel-btn" @onclick='() => Navigation.NavigateTo("/")'>
+            إلغاء
+        </button>
+    </div>
+</div>
+
+@code {
+    private string _serverUrl = "https://hq.newtech.pos/api";
+    private bool _autoSync = true;
+    private int _syncIntervalSeconds = 30;
+    private bool _branchAlerts = true;
+    private string _defaultCurrency = "EGP";
+    private bool _showProfitMargin = true;
+    private bool _enableGrowthComparison = true;
+    private bool _autoLockEnabled = true;
+    private int _autoLockMinutes = 15;
+    private bool _auditLogging = true;
+
+    private void SaveSettings()
+    {
+        Snackbar.Add("تم حفظ إعدادات المقر الرئيسي بنجاح", Severity.Success);
+    }
+}

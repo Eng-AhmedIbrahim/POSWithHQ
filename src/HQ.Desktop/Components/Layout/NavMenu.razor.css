@@ -1,124 +1,170 @@
+/* ══════════════════════════════════════════
+   HQ Desktop — Side Navigation  |  Gold
+   ══════════════════════════════════════════ */
+
 .side-nav {
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, #241b0c 0%, #1c1408 55%, #14100a 100%);
-    color: #f6e7b2;
-    border-left: 1px solid rgba(232, 200, 114, 0.18);
-    box-shadow: -12px 0 32px rgba(28, 20, 8, 0.12);
-    transition: width 0.24s ease;
+    background: linear-gradient(180deg,
+        #0f0900 0%,
+        #1c1200 30%,
+        #1a1000 70%,
+        #0d0800 100%);
+    color: #f0d060;
+    border-left: 1px solid rgba(212, 160, 23, 0.2);
+    box-shadow: -6px 0 28px rgba(0, 0, 0, 0.35);
+    transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     flex-shrink: 0;
 }
 
-.side-nav.is-open { width: 268px; }
+.side-nav.is-open    { width: 272px; }
 .side-nav.is-collapsed { width: 84px; }
 
+/* ─── Top bar ──────────────────────────── */
 .side-top {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 16px 14px 12px;
+    padding: 18px 14px 14px;
+    border-bottom: 1px solid rgba(212, 160, 23, 0.1);
 }
 
 .toggle-bar {
     width: 44px;
     height: 44px;
     flex-shrink: 0;
-    border: 1px solid rgba(232, 200, 114, 0.35);
+    border: 1px solid rgba(212, 160, 23, 0.3);
     border-radius: 14px;
-    background: rgba(246, 231, 178, 0.08);
-    color: #f6e7b2;
+    background: rgba(212, 160, 23, 0.07);
+    color: #f0d060;
     cursor: pointer;
     display: grid;
     place-items: center;
+    transition: background 0.18s, border-color 0.18s;
+    font-size: 1rem;
 }
 
 .toggle-bar:hover {
-    background: rgba(201, 162, 39, 0.28);
+    background: rgba(212, 160, 23, 0.2);
+    border-color: rgba(212, 160, 23, 0.55);
 }
 
+/* ─── Brand ────────────────────────────── */
 .brand {
     display: flex;
     align-items: center;
     gap: 10px;
     min-width: 0;
     cursor: pointer;
+    overflow: hidden;
 }
 
 .logo-mark {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 14px;
     display: grid;
     place-items: center;
-    font-weight: 800;
-    color: #1c1408;
-    background: linear-gradient(145deg, #f6e7b2, #c9a227);
+    font-weight: 900;
+    font-size: 0.9rem;
+    color: #1c1200;
+    background: linear-gradient(145deg, #f0cc50, #c9a227 55%, #9a7510);
     flex-shrink: 0;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35),
+                inset 0 1px 2px rgba(255, 249, 220, 0.4);
 }
 
 .brand-copy { min-width: 0; }
-.brand-name { font-weight: 800; white-space: nowrap; }
+
+.brand-name {
+    font-weight: 800;
+    white-space: nowrap;
+    font-size: 1rem;
+    color: #f0d060;
+}
+
 .brand-tag {
-    font-size: 0.72rem;
-    letter-spacing: 1px;
+    font-size: 0.68rem;
+    letter-spacing: 1.5px;
     text-transform: uppercase;
-    color: #e8c872;
+    color: rgba(240, 180, 30, 0.6);
     white-space: nowrap;
 }
 
+/* ─── Nav links ────────────────────────── */
 .side-links {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px 12px;
+    gap: 4px;
+    padding: 12px 10px;
     flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
 }
+
+.side-links::-webkit-scrollbar { display: none; }
 
 .nav-link,
 .foot-btn {
-    height: 48px;
+    height: 50px;
     border: 0;
     border-radius: 14px;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 12px;
-    color: #f6e7b2;
+    padding: 0 14px;
+    color: rgba(240, 208, 96, 0.72);
     background: transparent;
     cursor: pointer;
     font-family: inherit;
-    font-weight: 700;
-    font-size: 0.98rem;
+    font-weight: 600;
+    font-size: 0.95rem;
     white-space: nowrap;
+    transition: background 0.18s, color 0.18s;
+    text-decoration: none;
+}
+
+.nav-link i, .foot-btn i {
+    font-size: 1.1rem;
+    flex-shrink: 0;
 }
 
 .nav-link:hover,
-.foot-btn:hover { background: rgba(246, 231, 178, 0.08); }
-
-.nav-link.active {
-    color: #1c1408;
-    background: linear-gradient(135deg, #f6e7b2, #c9a227);
-    box-shadow: 0 10px 18px rgba(201, 162, 39, 0.22);
+.foot-btn:hover {
+    background: rgba(212, 160, 23, 0.1);
+    color: #f0d060;
 }
 
+.nav-link.active {
+    color: #1c1200;
+    background: linear-gradient(135deg, #f0cc50, #c9a227 55%, #a07a10);
+    box-shadow: 0 8px 22px rgba(201, 162, 39, 0.3),
+                inset 0 1px 0 rgba(255, 249, 220, 0.3);
+    font-weight: 800;
+}
+
+.nav-link.active i { color: #1c1200; }
+
+/* ─── Footer ───────────────────────────── */
 .side-foot {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 12px;
-    border-top: 1px solid rgba(232, 200, 114, 0.16);
+    gap: 6px;
+    padding: 12px 10px 16px;
+    border-top: 1px solid rgba(212, 160, 23, 0.14);
 }
 
 .user-pill {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 48px;
-    padding: 6px;
+    min-height: 52px;
+    padding: 6px 10px;
     border-radius: 16px;
-    background: rgba(246, 231, 178, 0.06);
+    background: rgba(212, 160, 23, 0.07);
+    border: 1px solid rgba(212, 160, 23, 0.14);
 }
 
 .user-avatar {
@@ -128,20 +174,26 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    color: #1c1408;
-    font-size: 0.75rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #f6e7b2, #c9a227);
+    color: #1c1200;
+    font-size: 0.7rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #f0cc50, #c9a227);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .user-name {
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+    color: #f0d060;
 }
 
-.foot-btn.danger { color: #fecdd3; }
+.foot-btn.danger { color: rgba(252, 165, 165, 0.75); }
+.foot-btn.danger:hover { background: rgba(239, 68, 68, 0.1); color: #fca5a5; }
 
+/* ─── Collapsed state ──────────────────── */
 .is-collapsed .brand-copy,
 .is-collapsed .nav-link span,
 .is-collapsed .user-name,
@@ -161,3 +213,26 @@
     flex-direction: column;
     padding-inline: 12px;
 }
+
+.is-collapsed .user-pill {
+    padding: 6px;
+}
+
+/* ─── Section separator ────────────────── */
+.nav-separator {
+    height: 1px;
+    background: rgba(212, 160, 23, 0.1);
+    margin: 4px 8px;
+}
+
+.nav-section-label {
+    font-size: 0.65rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(240, 208, 96, 0.35);
+    padding: 8px 14px 2px;
+    white-space: nowrap;
+}
+
+.is-collapsed .nav-separator,
+.is-collapsed .nav-section-label { display: none; }

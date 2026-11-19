@@ -70,6 +70,12 @@
                                     @RenderRolePermissionsEditor(WarehousePermissions)
                                 </RadzenTabsItem>
                             }
+                            @if (HqPermissions.Any())
+                            {
+                                <RadzenTabsItem Text="@(IsArabic ? "صلاحيات المقر الرئيسي" : "HQ Permissions")" Icon="domain">
+                                    @RenderRolePermissionsEditor(HqPermissions)
+                                </RadzenTabsItem>
+                            }
                         </Tabs>
                     </RadzenTabs>
                 </div>
@@ -137,7 +143,7 @@
     };
 
     RenderFragment RenderVoidAndSecuritySummary() => __builder => {
-        var allPerms = PosPermissions.Concat(BackOfficePermissions).Concat(WarehousePermissions).ToList();
+        var allPerms = PosPermissions.Concat(BackOfficePermissions).Concat(WarehousePermissions).Concat(HqPermissions).ToList();
         var allVoidDetails = GetAllVoidItemDetails();
 
         // Count granted vs locked
@@ -714,6 +720,7 @@
     private List<RoleToReturnDto> AllRoles = new();
     private List<PermissionDto> BackOfficePermissions = new();
     private List<PermissionDto> WarehousePermissions = new();
+    private List<PermissionDto> HqPermissions = new();
     private bool _isWarehouseSystem = false;
     private List<PermissionDto> PosPermissions = new();
     private Dictionary<string, HashSet<string>> RolePermissionsMap = new();
@@ -757,7 +764,9 @@
             
             var allPerms = (await AccountService.GetAllPermissions()).ToList();
             WarehousePermissions = allPerms.Where(p => p.IsWarehouse).ToList();
-            BackOfficePermissions = allPerms.Where(p => p.IsBackOffice && !p.IsWarehouse).ToList();
+            HqPermissions = allPerms.Where(p => p.IsHQ).ToList();
+            BackOfficePermissions = allPerms.Where(p => p.IsBackOffice && !p.IsWarehouse && !p.IsHQ).ToList();
+            PosPermissions = allPerms.Where(p => !p.IsBackOffice && !p.IsWarehouse && !p.IsHQ).ToList(); //
             PosPermissions = allPerms.Where(p => !p.IsBackOffice && !p.IsWarehouse).ToList();
 
             try
