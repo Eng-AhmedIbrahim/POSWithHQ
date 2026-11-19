@@ -40,7 +40,7 @@
             <div class="login-header">
                 <!-- App Window Icon Badge -->
                 <div class="app-icon-badge" title="New Tech HQ">
-                    <img src="NewTechHQ.ico" alt="HQ App Icon" class="hq-ico-img" />
+                    <img src="images/Logo.png" alt="HQ App Icon" class="hq-ico-img" />
                 </div>
                 <h2>مرحبًا بك</h2>
                 <p class="login-hint">اختر المستخدم وأدخل الرقم السري للمتابعة</p>
@@ -126,6 +126,36 @@
     {
         if (_client != null) return _client;
 
+        var baseUrl = Configuration["ApiSettings:BaseUrl"] ?? "http://100.79.100.86:5050";
+        var fallbackUrl = Configuration["ApiSettings:FallbackUrl"] ?? "http://localhost:5050";
+
+        // Test baseUrl first with a fast 2-second timeout
+        try
+        {
+            var testClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(2) };
+            var ping = await testClient.GetAsync("/api/Account/GetUsers");
+            if (ping.IsSuccessStatusCode)
+            {
+                _client = testClient;
+                return _client;
+            }
+        }
+        catch { }
+
+        // Test fallback local URL
+        try
+        {
+            var fallbackClient = new HttpClient { BaseAddress = new Uri(fallbackUrl), Timeout = TimeSpan.FromSeconds(2) };
+            var ping2 = await fallbackClient.GetAsync("/api/Account/GetUsers");
+            if (ping2.IsSuccessStatusCode)
+            {
+                _client = fallbackClient;
+                return _client;
+            }
+        }
+        catch { }
+
+        // Default to factory client
         var factory = ClientFactory;
         var apiName = Configuration["ApiSettings:ApiName"] ?? "POSAPI";
         _client = factory.CreateClient(apiName);
@@ -138,36 +168,36 @@
         try
         {
             var client = await GetClientAsync();
-            var response = await client.GetAsync("/api/Account/GetUsers");
-
-            if (response.IsSuccessStatusCode)
+            
+            // 1. Try /api/Account/GetUsers
+            try
             {
-                var usersString = await response.Content.ReadAsStringAsync();
-                var list = JsonSerializer.Deserialize<List<UserDto>>(usersString,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
-
-                _users = list.Where(u => u.IsActive)
-                             .OrderByDescending(u => u.UserName == "Administrator")
-                             .ThenBy(u => u.DisplayName)
-                             .ToList();
-            }
-            else
-            {
-                // Fallback attempt to local address if network IP was configured but unreachable
-                var fallbackUrl = Configuration["ApiSettings:FallbackUrl"];
-                if (!string.IsNullOrEmpty(fallbackUrl) && client.BaseAddress?.ToString() != fallbackUrl)
+                var response = await client.GetAsync("/api/Account/GetUsers");
+                if (response.IsSuccessStatusCode)
                 {
-                    using var fallbackClient = new HttpClient { BaseAddress = new Uri(fallbackUrl), Timeout = TimeSpan.FromSeconds(5) };
-                    var fallbackResp = await fallbackClient.GetAsync("/api/Account/GetUsers");
-                    if (fallbackResp.IsSuccessStatusCode)
+                    var usersString = await response.Content.ReadAsStringAsync();
+                    var list = JsonSerializer.Deserialize<List<UserDto>>(usersString,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                    _users = list.Where(u => u.IsActive).ToList();
+                }
+            }
+            catch { }
+
+            // 2. If GetUsers returned 0 users, query /api/Account/get-users (all active database users)
+            if (_users.Count == 0)
+            {
+                try
+                {
+                    var allResp = await client.GetAsync("/api/Account/get-users");
+                    if (allResp.IsSuccessStatusCode)
                     {
-                        var usersString = await fallbackResp.Content.ReadAsStringAsync();
-                        var list = JsonSerializer.Deserialize<List<UserDto>>(usersString,
+                        var allString = await allResp.Content.ReadAsStringAsync();
+                        var list = JsonSerializer.Deserialize<List<UserDto>>(allString,
                             new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
                         _users = list.Where(u => u.IsActive).ToList();
-                        _client = fallbackClient;
                     }
                 }
+                catch { }
             }
         }
         catch (Exception)
@@ -176,16 +206,24 @@
         }
         finally
         {
-            // If API didn't return any users (e.g. offline dev or unseeded DB), load default HQ admin
+            // If offline, provide database default users so the dropdown always has real accounts
             if (_users.Count == 0)
             {
                 _users = new List<UserDto>
                 {
-                    new UserDto { UserName = "Administrator", DisplayName = "مدير النظام (Administrator)" },
-                    new UserDto { UserName = "مدير المقر", DisplayName = "مدير المقر الرئيسي" },
-                    new UserDto { UserName = "مدير العمليات", DisplayName = "مدير العمليات المركزية" }
+                    new UserDto { UserName = "Administrator", DisplayName = "مدير النظام (Administrator)", IsActive = true },
+                    new UserDto { UserName = "CashierMorning", DisplayName = "كاشير صباحي (CashierMorning)", IsActive = true },
+                    new UserDto { UserName = "CashierEvening", DisplayName = "كاشير مسائي (CashierEvening)", IsActive = true },
+                    new UserDto { UserName = "CaptainMorning", DisplayName = "كابتن صباحي (CaptainMorning)", IsActive = true },
+                    new UserDto { UserName = "CaptainEvening", DisplayName = "كابتن مسائي (CaptainEvening)", IsActive = true },
+                    new UserDto { UserName = "DriverMorning", DisplayName = "طيار صباحي (DriverMorning)", IsActive = true },
+                    new UserDto { UserName = "DriverEvening", DisplayName = "طيار مسائي (DriverEvening)", IsActive = true }
                 };
             }
+
+            _users = _users.OrderByDescending(u => u.UserName == "Administrator")
+                           .ThenBy(u => u.DisplayName)
+                           .ToList();
 
             _isLoadingUsers = false;
             StateHasChanged();
