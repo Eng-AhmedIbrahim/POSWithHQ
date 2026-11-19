@@ -17,6 +17,22 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        this.DispatcherUnhandledException += (s, args) =>
+        {
+            MessageBox.Show($"خطأ في واجهة التطبيق:\n{args.Exception.Message}\n\n{args.Exception.InnerException?.Message}", 
+                "خطأ New Tech HQ", MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (s, args) =>
+        {
+            if (args.ExceptionObject is Exception ex)
+            {
+                MessageBox.Show($"خطأ غير متوقع:\n{ex.Message}\n\n{ex.InnerException?.Message}", 
+                    "خطأ New Tech HQ", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        };
+
         base.OnStartup(e);
 
         var configuration = new ConfigurationBuilder()

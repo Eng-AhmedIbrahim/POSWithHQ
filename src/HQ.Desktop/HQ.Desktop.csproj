@@ -13,7 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="NewTechHQ.ico" />
+    <Resource Include="NewTechHQ.ico" />
+    <Content Update="NewTechHQ.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
