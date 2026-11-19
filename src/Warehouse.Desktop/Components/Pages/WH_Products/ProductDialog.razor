@@ -1,0 +1,544 @@
+﻿@using MudBlazor
+@using DialogOptions = MudBlazor.DialogOptions
+@using Variant = MudBlazor.Variant
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudDialog dir="rtl" Style="max-width: 960px; width: 95vw; border-radius: 20px; overflow: hidden;">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between w-100 pa-1 pb-2 border-b">
+            <div class="d-flex align-center gap-3">
+                <div class="pa-3 rounded-xl" style="background: linear-gradient(135deg, #f97316, #ea580c); color: white; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);">
+                    <MudIcon Icon="@(ProductId.HasValue ? Icons.Material.Filled.Edit : Icons.Material.Filled.AddBox)" Size="MudBlazor.Size.Medium" />
+                </div>
+                <div>
+                    <MudText Typo="MudBlazor.Typo.h6" Style="font-weight: 900; color: #1e293b;">
+                        @(ProductId.HasValue ? "تعديل صنف مخزني" : "إضافة صنف مخزني جديد")
+                    </MudText>
+                    <MudText Typo="MudBlazor.Typo.caption" Color="MudBlazor.Color.Secondary">
+                        تعريف بيانات المادة الخام أو الصنف، وحدات القياس، حد الأمان والتكلفة التقديرية
+                    </MudText>
+                </div>
+            </div>
+            <MudIconButton Icon="@Icons.Material.Rounded.Close" Color="MudBlazor.Color.Default" OnClick="Cancel" Style="border-radius: 50%;" />
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (IsLoading)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="MudBlazor.Color.Warning" />
+            </div>
+        }
+        else
+        {
+        <div dir="rtl">
+            <MudForm @ref="Form" @bind-IsValid="IsFormValid">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block" Style="color:#475569;">
+                            كود الصنف (SKU / Barcode)
+                        </MudText>
+                        <MudTextField @bind-Value="Model.ProductCode"
+                                      Placeholder="اتركه فارغاً للتوليد التلقائي..."
+                                      Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" md="6" Class="d-flex align-center pt-5">
+                        <MudSwitch T="bool" @bind-Value="Model.IsActive" Label="الصنف نشط وجاهز للعمليات" Color="MudBlazor.Color.Success" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block" Style="color:#475569;">
+                            الاسم بالعربية *
+                        </MudText>
+                        <MudTextField @bind-Value="Model.Name" Required="true" RequiredError="اسم الصنف بالعربية مطلوب"
+                                      Placeholder="مثال: دقيق فاخر 72%، زيت نخل..."
+                                      Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block" Style="color:#475569;">
+                            الاسم بالإنجليزية (اختياري)
+                        </MudText>
+                        <MudTextField @bind-Value="Model.NameEn"
+                                      Placeholder="e.g. Flour 72%, Palm Oil..."
+                                      Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold" Style="color:#475569;">
+                                الفئة (التصنيف) *
+                            </MudText>
+                            <MudLink Typo="MudBlazor.Typo.caption" OnClick="OpenManageCategories" Class="fw-bold cursor-pointer"
+                                     Style="color: #ea580c; text-decoration: none;">
+                                <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Small" Class="me-1" Style="vertical-align: middle; font-size: 0.95rem;" />
+                                إدارة وإضافة فئات
+                            </MudLink>
+                        </div>
+                        <MudSelect T="int?" @bind-Value="Model.CategoryId" Required="true" RequiredError="يرجى اختيار الفئة"
+                                   Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter"
+                                   Placeholder="-- اختر فئة الصنف --">
+                            @foreach (var cat in Categories)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)cat.Id)">@cat.DisplayName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" md="6">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold" Style="color:#475569;">
+                                وحدة التخزين الأساسية *
+                            </MudText>
+                            <MudLink Typo="MudBlazor.Typo.caption" OnClick="OpenManageUnits" Class="fw-bold cursor-pointer"
+                                     Style="color: #0284c7; text-decoration: none;">
+                                <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Small" Class="me-1" Style="vertical-align: middle; font-size: 0.95rem;" />
+                                إدارة وإضافة وحدات
+                            </MudLink>
+                        </div>
+                        <MudSelect T="int?" @bind-Value="Model.BaseUnitId" @bind-Value:after="StateHasChanged" Required="true" RequiredError="يرجى تحديد وحدة الأساس"
+                                   Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter"
+                                   Placeholder="-- اختر الوحدة الأساسية (كغ، لتر، حبة) --">
+                            @foreach (var u in Units)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)u.Id)">@u.DisplayName</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block" Style="color:#475569;">
+                            الوصف والملاحظات
+                        </MudText>
+                        <MudTextField @bind-Value="Model.Description" Lines="2"
+                                      Placeholder="ملاحظات مواصفات الجودة أو التخزين..."
+                                      Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold" Style="color:#475569;">
+                                سعر التكلفة التقديري *
+                            </MudText>
+                            <span class="px-2 py-0 rounded" style="background:#e0f2fe; color:#0284c7; font-weight:800; font-size:0.75rem;">
+                                لكل 1 @GetSelectedBaseUnitName()
+                            </span>
+                        </div>
+                        <MudNumericField @bind-Value="Model.CostPrice" Format="N2" HideSpinButtons="true"
+                                         Min="0m" Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense"
+                                         Adornment="Adornment.End" AdornmentText="@($"ج.م / {GetSelectedBaseUnitName()}")"
+                                         HelperText="@($"تكلفة 1 {GetSelectedBaseUnitName()} (الوحدة الأساسية)")" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold" Style="color:#475569;">
+                                سعر البيع (إن وُجد)
+                            </MudText>
+                            <span class="px-2 py-0 rounded" style="background:#f1f5f9; color:#475569; font-weight:700; font-size:0.75rem;">
+                                لكل @GetSelectedBaseUnitName()
+                            </span>
+                        </div>
+                        <MudNumericField @bind-Value="Model.SalePrice" Format="N2" HideSpinButtons="true"
+                                         Min="0m" Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense"
+                                         Adornment="Adornment.End" AdornmentText="@($"ج.م / {GetSelectedBaseUnitName()}")"
+                                         HelperText="سعر البيع للفرع أو المستهلك" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold" Style="color:#475569;">
+                                حد إعادة الطلب (Reorder)
+                            </MudText>
+                            <span class="px-2 py-0 rounded" style="background:#fef3c7; color:#b45309; font-weight:700; font-size:0.75rem;">
+                                تنبيه نقص
+                            </span>
+                        </div>
+                        <MudNumericField @bind-Value="Model.ReorderLevel" Format="N2" HideSpinButtons="true"
+                                         Min="0m" Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense"
+                                         Adornment="Adornment.End" AdornmentText="@GetSelectedBaseUnitName()"
+                                         HelperText="طلب شراء من المورد عند وصوله" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold" Style="color:#475569;">
+                                الحد الأدنى للأمان (Safety)
+                            </MudText>
+                            <span class="px-2 py-0 rounded" style="background:#fee2e2; color:#b91c1c; font-weight:700; font-size:0.75rem;">
+                                رصيد حرج
+                            </span>
+                        </div>
+                        <MudNumericField @bind-Value="Model.MinimumStock" Format="N2" HideSpinButtons="true"
+                                         Min="0m" Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense"
+                                         Adornment="Adornment.End" AdornmentText="@GetSelectedBaseUnitName()"
+                                         HelperText="رصيد الطوارئ الذي لا يقل عنه" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <MudText MudBlazor.Typo="Typo.subtitle1" Style="font-weight: 700; color:#1e293b;">
+                        <MudIcon Icon="@Icons.Material.Filled.Scale" Class="me-1" Size="MudBlazor.Size.Small" />
+                        وحدات القياس المتعددة للصنف (Multi-Units)
+                    </MudText>
+                    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="MudBlazor.Variant.Outlined"
+                               Color="MudBlazor.Color.Warning" Size="MudBlazor.Size.Small" OnClick="AddUnit">
+                        إضافة وحدة إضافية
+                    </MudButton>
+                </div>
+
+                @if (!Model.ProductUnits.Any())
+                {
+                    <MudText Typo="MudBlazor.Typo.caption" Class="d-block text-muted mb-2">
+                        يكفي تحديد وحدة الأساس أعلاه. يمكنك إضافة وحدات أخرى إن كان الصنف يُشترى بالكرتون أو الشيكارة ويُصرف بالكيلو.
+                    </MudText>
+                }
+
+                @foreach (var pu in Model.ProductUnits)
+                {
+                    <MudPaper Class="pa-2 mb-2" Elevation="0" Style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px;">
+                        <MudGrid Spacing="2" Class="align-center">
+                            <MudItem xs="12" md="4">
+                                <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block">الوحدة</MudText>
+                                <MudSelect T="int?" @bind-Value="pu.UnitId" @bind-Value:after="StateHasChanged" Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense">
+                                    @foreach (var u in Units)
+                                    {
+                                        <MudSelectItem T="int?" Value="@((int?)u.Id)">@u.DisplayName</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block">معامل التحويل لوحدة الأساس</MudText>
+                                <MudNumericField @bind-Value="pu.ConversionFactor" @bind-Value:after="StateHasChanged" Format="N3" HideSpinButtons="true"
+                                                 Min="0.001m" Variant="MudBlazor.Variant.Outlined" Margin="Margin.Dense"
+                                                 HelperText="@GetUnitHelperText(pu)" />
+                            </MudItem>
+                            <MudItem xs="12" md="3" Class="pt-4">
+                                <MudCheckBox T="bool" @bind-Value="pu.IsDefault" Label="وحدة الشراء الافتراضية" Color="MudBlazor.Color.Warning" Dense="true" />
+                            </MudItem>
+                            <MudItem xs="12" md="1" Class="d-flex justify-end pt-3">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error"
+                                               Size="MudBlazor.Size.Small" OnClick="() => RemoveUnit(pu)" Title="حذف الوحدة" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                }
+            </MudForm>
+        </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <div class="d-flex gap-2 pa-2" dir="rtl">
+            <MudButton OnClick="Cancel" Variant="MudBlazor.Variant.Outlined" Style="min-width: 100px;">إلغاء</MudButton>
+            <MudButton OnClick="Save" Variant="MudBlazor.Variant.Filled" Color="MudBlazor.Color.Warning"
+                       Disabled="IsSaving || !IsFormValid" Style="min-width: 120px; font-weight: 700;">
+                @if (IsSaving) { <MudProgressCircular Size="MudBlazor.Size.Small" Indeterminate="true" Class="me-2" /> }
+                @(ProductId.HasValue ? "حفظ التعديلات" : "إضافة الصنف")
+            </MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int? ProductId { get; set; }
+
+    private class CategoryDto
+    {
+        public int Id { get; set; }
+        public string? Code { get; set; }
+        public string? NameAr { get; set; }
+        public string? NameEn { get; set; }
+        public string? ArabicName { get; set; }
+        public string? EnglishName { get; set; }
+        public string? Name { get; set; }
+        public string DisplayName => !string.IsNullOrWhiteSpace(NameAr) ? NameAr : (!string.IsNullOrWhiteSpace(ArabicName) ? ArabicName : (!string.IsNullOrWhiteSpace(Name) ? Name : (EnglishName ?? NameEn ?? $"فئة {Id}")));
+    }
+
+    private class UnitDto
+    {
+        public int Id { get; set; }
+        public string? ArabicName { get; set; }
+        public string? EnglishName { get; set; }
+        public string? Name { get; set; }
+        public string? NameAr { get; set; }
+        public string? NameEn { get; set; }
+        public string DisplayName => !string.IsNullOrWhiteSpace(ArabicName) ? ArabicName : (!string.IsNullOrWhiteSpace(NameAr) ? NameAr : (!string.IsNullOrWhiteSpace(Name) ? Name : EnglishName ?? NameEn ?? ""));
+    }
+
+    private class ProductUnitModel
+    {
+        public int? UnitId { get; set; }
+        public decimal ConversionFactor { get; set; } = 1;
+        public decimal ConversionFactorToBase
+        {
+            get => ConversionFactor;
+            set => ConversionFactor = value;
+        }
+        public bool IsDefault { get; set; }
+        public bool IsDefaultPurchaseUnit
+        {
+            get => IsDefault;
+            set => IsDefault = value;
+        }
+    }
+
+    private class ProductModel
+    {
+        public int Id { get; set; }
+        public string? SKU { get; set; }
+        public string? ProductCode
+        {
+            get => SKU;
+            set => SKU = value;
+        }
+
+        public string NameAr { get; set; } = string.Empty;
+        public string Name
+        {
+            get => NameAr;
+            set => NameAr = value;
+        }
+
+        public string? NameEn { get; set; }
+        public int? CategoryId { get; set; }
+        public string? CategoryName { get; set; }
+        public string? Description { get; set; }
+        public int? BaseUnitId { get; set; }
+
+        public decimal LastPurchaseCost { get; set; }
+        public decimal WeightedAverageCost { get; set; }
+        public decimal CostPrice
+        {
+            get => LastPurchaseCost > 0 ? LastPurchaseCost : WeightedAverageCost;
+            set { LastPurchaseCost = value; WeightedAverageCost = value; }
+        }
+
+        public decimal SalePrice { get; set; }
+        public decimal ReorderPoint { get; set; }
+        public decimal ReorderLevel
+        {
+            get => ReorderPoint;
+            set => ReorderPoint = value;
+        }
+
+        public decimal MinStockLevel { get; set; }
+        public decimal MinimumStock
+        {
+            get => MinStockLevel;
+            set => MinStockLevel = value;
+        }
+
+        public bool IsActive { get; set; } = true;
+        public List<ProductUnitModel> ProductUnits { get; set; } = new();
+        public List<ProductUnitModel>? Units
+        {
+            get => ProductUnits;
+            set { if (value != null) ProductUnits = value; }
+        }
+    }
+
+    private MudForm Form = default!;
+    private ProductModel Model = new();
+    private List<CategoryDto> Categories = new();
+    private List<UnitDto> Units = new();
+    private bool IsFormValid = false;
+    private bool IsLoading = false;
+    private bool IsSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            List<CategoryDto>? cats = null;
+            try { cats = await Http.GetFromJsonAsync<List<CategoryDto>>("api/warehouseproducts/categories"); }
+            catch { try { cats = await Http.GetFromJsonAsync<List<CategoryDto>>("api/warehouse/products/categories"); } catch { } }
+            Categories = cats ?? new();
+
+            List<UnitDto>? units = null;
+            try { units = await Http.GetFromJsonAsync<List<UnitDto>>("api/warehouse/products/units"); }
+            catch
+            {
+                try { units = await Http.GetFromJsonAsync<List<UnitDto>>("api/warehouseproducts/units"); }
+                catch
+                {
+                    try { units = await Http.GetFromJsonAsync<List<UnitDto>>("api/units"); }
+                    catch { try { units = await Http.GetFromJsonAsync<List<UnitDto>>("api/units/lookup"); } catch { } }
+                }
+            }
+            Units = units ?? new();
+
+            if (ProductId.HasValue)
+            {
+                var existing = await Http.GetFromJsonAsync<ProductModel>($"/api/warehouseproducts/{ProductId}");
+                if (existing != null)
+                {
+                    Model = existing;
+                    if (!string.IsNullOrEmpty(Model.CategoryName) && !Model.CategoryId.HasValue)
+                    {
+                        var matchingCat = Categories.FirstOrDefault(c => c.DisplayName == Model.CategoryName || c.ArabicName == Model.CategoryName);
+                        if (matchingCat != null) Model.CategoryId = matchingCat.Id;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ في التحميل: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void AddUnit() => Model.ProductUnits.Add(new ProductUnitModel());
+    private void RemoveUnit(ProductUnitModel u) => Model.ProductUnits.Remove(u);
+
+    private string GetSelectedBaseUnitName()
+    {
+        var u = Units.FirstOrDefault(x => x.Id == Model.BaseUnitId);
+        return u?.DisplayName ?? "الوحدة الأساسية";
+    }
+
+    private string GetUnitHelperText(ProductUnitModel pu)
+    {
+        var baseUnit = Units.FirstOrDefault(u => u.Id == Model.BaseUnitId)?.DisplayName;
+        var currentUnit = Units.FirstOrDefault(u => u.Id == pu.UnitId)?.DisplayName;
+        var factorStr = pu.ConversionFactor > 0 ? pu.ConversionFactor.ToString("0.###") : "1";
+        var unitCost = Model.CostPrice * pu.ConversionFactor;
+
+        if (string.IsNullOrWhiteSpace(currentUnit) && string.IsNullOrWhiteSpace(baseUnit))
+            return $"1 وحدة = {factorStr} وحدة أساس";
+        if (string.IsNullOrWhiteSpace(currentUnit))
+            return $"1 وحدة = {factorStr} {baseUnit} (التكلفة: {unitCost:N2} ج.م)";
+        if (string.IsNullOrWhiteSpace(baseUnit))
+            return $"1 {currentUnit} = {factorStr} وحدة أساس (التكلفة: {unitCost:N2} ج.م)";
+        return $"1 {currentUnit} = {factorStr} {baseUnit} (التكلفة: {unitCost:N2} ج.م)";
+    }
+
+    private async Task Save()
+    {
+        await Form.Validate();
+        if (!IsFormValid) return;
+
+        IsSaving = true;
+        try
+        {
+            var selectedCat = Categories.FirstOrDefault(c => c.Id == Model.CategoryId);
+            var categoryName = selectedCat?.DisplayName ?? Model.CategoryName;
+
+            var finalSKU = !string.IsNullOrWhiteSpace(Model.ProductCode) 
+                ? Model.ProductCode.Trim() 
+                : $"RAW-{DateTime.Now:yyMMdd}-{new Random().Next(100, 999)}";
+
+            var payload = new
+            {
+                Id = ProductId ?? 0,
+                SKU = finalSKU,
+                Barcode = finalSKU,
+                NameAr = Model.Name,
+                NameEn = Model.NameEn,
+                CategoryId = Model.CategoryId,
+                CategoryName = categoryName,
+                Description = Model.Description,
+                BaseUnitId = Model.BaseUnitId ?? 0,
+                WeightedAverageCost = Model.CostPrice,
+                LastPurchaseCost = Model.CostPrice,
+                MinStockLevel = Model.MinimumStock,
+                ReorderPoint = Model.ReorderLevel,
+                ReorderQuantity = Model.ReorderLevel > 0 ? Model.ReorderLevel : 10,
+                IsActive = Model.IsActive,
+                ProductUnits = Model.ProductUnits.Where(u => u.UnitId.HasValue).Select(u => new
+                {
+                    UnitId = u.UnitId!.Value,
+                    ConversionFactorToBase = u.ConversionFactor > 0 ? u.ConversionFactor : 1,
+                    IsDefaultPurchaseUnit = u.IsDefault,
+                    IsDefaultRequisitionUnit = u.IsDefault
+                }).ToList()
+            };
+
+            HttpResponseMessage response;
+            if (ProductId.HasValue)
+                response = await Http.PutAsJsonAsync($"/api/warehouseproducts/{ProductId}", payload);
+            else
+                response = await Http.PostAsJsonAsync("/api/warehouseproducts", payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(ProductId.HasValue ? "تم تعديل الصنف بنجاح" : "تم إضافة الصنف بنجاح", MudBlazor.Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                var err = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"فشل الحفظ: {err}", MudBlazor.Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task OpenManageCategories()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ManageCategoriesDialog>("إدارة فئات وتصنيفات الأصناف المخزنية", options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await ReloadCategories();
+        }
+    }
+
+    private async Task ReloadCategories()
+    {
+        try
+        {
+            var cats = await Http.GetFromJsonAsync<List<CategoryDto>>("api/warehouseproducts/categories");
+            if (cats != null)
+            {
+                Categories = cats;
+                StateHasChanged();
+            }
+        }
+        catch { }
+    }
+
+    private async Task OpenManageUnits()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<ManageUnitsDialog>("إدارة وحدات القياس المخزنية", options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await ReloadUnits();
+        }
+    }
+
+    private async Task ReloadUnits()
+    {
+        try
+        {
+            var units = await Http.GetFromJsonAsync<List<UnitDto>>("api/warehouseproducts/units");
+            if (units != null)
+            {
+                Units = units;
+                StateHasChanged();
+            }
+        }
+        catch { }
+    }
+}

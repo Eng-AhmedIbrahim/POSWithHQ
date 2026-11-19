@@ -1,0 +1,162 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>New Tech WMS - Warehouse Management System</title>
+    <link href="fonts.css" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <link href="_content/Blazor.Bootstrap/blazor.bootstrap.css" rel="stylesheet" />
+    <link rel="stylesheet" href="_content/Radzen.Blazor/css/standard-base.css">
+    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="pos.css" />
+    <link rel="stylesheet" href="delivery.css" />
+    <link rel="stylesheet" href="warehouse-login.css" />
+    <link href="Warehouse.Desktop.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <div style="text-align: center; padding: 50px;">
+            <h2>Loading...</h2>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">ðŸ—™</a>
+    </div>
+    <script src="_framework/blazor.webview.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.0.1/chart.umd.js"
+        integrity="sha512-gQhCDsnnnUfaRzD8k1L5llCCV6O9HN09zClIzzeJ8OJ9MpGmIlCxm+pdCkqTwqJ4JcjbojFr79rl2F1mzcoLMQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"
+        integrity="sha512-JPcRR8yFa8mmCsfrw4TNte1ZvF1e3+1SdGMslZvmrzDYxS69J7J49vkFL8u6u8PlPJK+H3voElBtUCzaXj+6ig=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="_content/Blazor.Bootstrap/blazor.bootstrap.js"></script>
+    <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
+    <script src="site.js?v=3"></script>
+    <script>
+        window.printReportElement = function (selector) {
+            try {
+                var target = document.querySelector(selector || '.wh-printable-sheet');
+                if (!target) {
+                    window.print();
+                    return;
+                }
+                var oldIframe = document.getElementById('wh-print-isolated-frame');
+                if (oldIframe) {
+                    oldIframe.parentNode.removeChild(oldIframe);
+                }
+                var iframe = document.createElement('iframe');
+                iframe.id = 'wh-print-isolated-frame';
+                iframe.style.position = 'fixed';
+                iframe.style.right = '0';
+                iframe.style.bottom = '0';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                iframe.style.border = '0';
+                iframe.style.opacity = '0';
+                document.body.appendChild(iframe);
+
+                var doc = iframe.contentWindow.document;
+                doc.open();
+                doc.write('<!DOCTYPE html>' +
+                    '<html dir="rtl" lang="ar">' +
+                    '<head>' +
+                    '<meta charset="utf-8" />' +
+                    '<title>طباعة</title>' +
+                    '<link href="fonts.css" rel="stylesheet" />' +
+                    '<style>' +
+                    '* { box-sizing: border-box; }' +
+                    'html, body { margin: 0; padding: 0; background: #fff; font-family: "Tajawal", "Segoe UI", Tahoma, sans-serif; direction: rtl; color: #0f172a; width: 100%; }' +
+                    '@page { size: A4 portrait; margin: 10mm 8mm; }' +
+                    '.wh-printable-sheet { width: 100% !important; max-width: 100% !important; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; background: #fff !important; }' +
+                    'table { width: 100%; border-collapse: collapse; page-break-inside: auto; }' +
+                    'tr { page-break-inside: avoid; page-break-after: auto; }' +
+                    'thead { display: table-header-group; }' +
+                    'tfoot { display: table-footer-group; }' +
+                    '</style>' +
+                    '</head>' +
+                    '<body>' +
+                    target.outerHTML +
+                    '</body>' +
+                    '</html>');
+                doc.close();
+
+                setTimeout(function () {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                }, 300);
+            } catch (e) {
+                console.error('Print error:', e);
+                window.print();
+            }
+        };
+    </script>
+
+    <script>
+        function setTableItemCount(count) {
+            localStorage.setItem('tableItemCount', count);
+        }
+
+        window.addEventListener('beforeunload', function (event) {
+            const count = localStorage.getItem('tableItemCount') || 0;
+            if (count > 0) {
+                event.preventDefault();
+                event.returnValue = 'You have unfinished orders. Please finish them before leaving.';
+            }
+        });
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') {
+                clearTableItems();
+            }
+        });
+
+        function clearTableItems() {
+            localStorage.removeItem('tableItemCount');
+            console.log('Table items cleared');
+        }
+
+        let lastEnterTime = 0;
+
+        window.downloadBase64File = (fileName, contentType, base64Data) => {
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = `data:${contentType};base64,${base64Data}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        window.listenToDoubleEnter = function (dotNetHelper) {
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+
+                    const now = Date.now();
+                    if (now - lastEnterTime < 500) {
+                        dotNetHelper.invokeMethodAsync("ExecuteDoubleEnterFunction");
+                    }
+                    lastEnterTime = now;
+                }
+            });
+        };
+    </script>
+</body>
+
+</html>
+

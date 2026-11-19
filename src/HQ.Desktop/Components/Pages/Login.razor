@@ -1,0 +1,100 @@
+@page "/login"
+@layout AuthLayout
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@using HQ.Desktop.Auth
+
+<div class="login-page">
+    <div class="brand-section">
+        <button class="close-app-btn" @onclick="ExitApp">
+            <i class="bi bi-x-lg"></i>
+        </button>
+        <div class="brand-content">
+            <div class="brand-logo">HQ</div>
+            <h1 class="brand-title">New Tech</h1>
+            <p class="brand-subtitle">Headquarters</p>
+        </div>
+    </div>
+
+    <div class="login-section">
+        <div class="login-card">
+            <div class="login-header">
+                <h2>مرحبًا بك</h2>
+            </div>
+            <div class="login-form">
+                <div class="form-group">
+                    <select dir="rtl" class="form-control-custom select-user" @onchange="OnUserChanged">
+                        <option value="" disabled selected="@(string.IsNullOrEmpty(_userName))">اختر المستخدم</option>
+                        @foreach (var user in _users)
+                        {
+                            <option value="@user.Name">@user.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <input type="password" class="form-control-custom otp-display" placeholder="الرقم السري"
+                           @bind="_pin" @bind:event="oninput" @onkeydown="OnKeyDown" />
+                </div>
+                <div class="keypad-grid">
+                    @for (var i = 1; i <= 9; i++)
+                    {
+                        var digit = i.ToString();
+                        <div class="keypad-btn" @onclick="() => AddDigit(digit)">@digit</div>
+                    }
+                    <div class="keypad-btn action-btn bs" @onclick="DeleteLast"><i class="bi bi-backspace"></i></div>
+                    <div class="keypad-btn" @onclick='() => AddDigit("0")'>0</div>
+                    <div class="keypad-btn action-btn del" @onclick="Clear">C</div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-custom btn-primary-custom" @onclick="SubmitLogin">دخول</button>
+                    <button class="btn-custom btn-danger-custom" @onclick="ExitApp">خروج</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly (string Name, string Pin)[] _users =
+    [
+        ("مدير المقر", "1234"),
+        ("مدير العمليات", "0000")
+    ];
+
+    private string _userName = "";
+    private string _pin = "";
+
+    private void OnUserChanged(ChangeEventArgs args) => _userName = args.Value?.ToString() ?? "";
+    private void AddDigit(string digit) => _pin += digit;
+    private void Clear() => _pin = "";
+    private void DeleteLast() { if (_pin.Length > 0) _pin = _pin[..^1]; }
+
+    private void OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+            SubmitLogin();
+    }
+
+    private void SubmitLogin()
+    {
+        var user = _users.FirstOrDefault(u => u.Name == _userName);
+        if (string.IsNullOrEmpty(_userName))
+        {
+            Snackbar.Add("اختر المستخدم أولًا", Severity.Warning);
+            return;
+        }
+        if (user.Pin != _pin)
+        {
+            Snackbar.Add("الرقم السري غير صحيح", Severity.Error);
+            return;
+        }
+
+        if (AuthStateProvider is HqAuthStateProvider auth)
+            auth.SignIn(_userName);
+        Navigation.NavigateTo("/");
+    }
+
+    private static void ExitApp() => System.Windows.Application.Current.Shutdown();
+}

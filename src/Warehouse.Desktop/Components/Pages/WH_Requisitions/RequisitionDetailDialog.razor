@@ -1,0 +1,911 @@
+@using MudBlazor
+@using System.Net.Http.Json
+@using BlazorBase.Services
+@using Warehouse.Desktop.Services
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+@inject LocalizationService LocalizerService
+@inject IDesktopPrintingService PrintingService
+@inject IJSRuntime JS
+
+<MudDialog dir="rtl" Style="max-width: 1000px; width: 95vw; border-radius: 20px; overflow: hidden;">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between w-100 pa-1 pb-2 border-b">
+            <div class="d-flex align-center gap-3">
+                <div class="pa-3 rounded-xl" style="background: linear-gradient(135deg, #f97316, #ea580c); color: white; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);">
+                    <MudIcon Icon="@Icons.Material.Rounded.Inventory2" Size="MudBlazor.Size.Medium" />
+                </div>
+                <div>
+                    <div class="d-flex align-center gap-2 flex-wrap">
+                        <MudText Typo="MudBlazor.Typo.h6" Style="font-weight: 900; color: #1e293b;">
+                            تفاصيل طلب التوريد
+                        </MudText>
+                        @if (_requisition != null)
+                        {
+                            <MudChip T="string" Color="MudBlazor.Color.Warning" Variant="MudBlazor.Variant.Filled" Style="font-weight: 800; font-size: 0.95rem; border-radius: 8px;">
+                                @_requisition.RequisitionNumber
+                            </MudChip>
+                            <MudChip T="string" Color="@GetStatusColor(_requisition.Status)" Size="MudBlazor.Size.Small" Variant="MudBlazor.Variant.Filled" Style="font-weight: 700; border-radius: 8px;">
+                                @GetStatusLabel(_requisition.Status)
+                            </MudChip>
+                        }
+                    </div>
+                    <MudText Typo="MudBlazor.Typo.caption" Color="MudBlazor.Color.Secondary">
+                        متابعة واعتماد طلبيات التوريد وإدارة الشحنات والكميات
+                    </MudText>
+                </div>
+            </div>
+            <div class="d-flex align-center gap-2">
+                @if (_requisition != null)
+                {
+                    <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Warning" Size="MudBlazor.Size.Small"
+                               StartIcon="@Icons.Material.Rounded.Print" OnClick="@(() => _showPrintPreview = true)" Style="font-weight: 700; border-radius: 8px;">
+                        معاينة وطباعة
+                    </MudButton>
+                    <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Success" Size="MudBlazor.Size.Small"
+                               StartIcon="@Icons.Material.Rounded.TableChart" OnClick="ExportExcel" Style="font-weight: 700; border-radius: 8px;">
+                        إكسيل
+                    </MudButton>
+                }
+                <MudIconButton Icon="@Icons.Material.Rounded.Close" Color="MudBlazor.Color.Default" OnClick="Cancel" Style="border-radius: 50%;" />
+            </div>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        <div dir="rtl" class="pt-2">
+            @if (_loading)
+            {
+                <div class="d-flex justify-center align-center pa-12">
+                    <MudProgressCircular Color="MudBlazor.Color.Warning" Indeterminate="true" Size="MudBlazor.Size.Large" />
+                </div>
+            }
+            else if (_requisition != null)
+            {
+                <!-- Summary Cards -->
+                <MudGrid Spacing="2" Class="mb-4">
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-3 rounded-xl border d-flex flex-column justify-center" Elevation="0" Style="background: #f8fafc; border-color: #e2e8f0; height: 100%;">
+                            <MudText Typo="MudBlazor.Typo.caption" Color="MudBlazor.Color.Secondary" Style="font-weight: 700;">الفرع الطالب</MudText>
+                            <div class="d-flex align-center gap-2 mt-1">
+                                <MudIcon Icon="@Icons.Material.Rounded.Storefront" Size="MudBlazor.Size.Small" Style="color: #f97316;" />
+                                <MudText Typo="MudBlazor.Typo.body2" Style="font-weight: 800; color: #1e293b;">
+                                    @(!string.IsNullOrEmpty(_requisition.FromBranchName) ? _requisition.FromBranchName : (!string.IsNullOrEmpty(_requisition.BranchName) ? _requisition.BranchName : "الفرع"))
+                                </MudText>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-3 rounded-xl border d-flex flex-column justify-center" Elevation="0" Style="background: #f8fafc; border-color: #e2e8f0; height: 100%;">
+                            <MudText Typo="MudBlazor.Typo.caption" Color="MudBlazor.Color.Secondary" Style="font-weight: 700;">المخزن المورد</MudText>
+                            <div class="d-flex align-center gap-2 mt-1">
+                                <MudIcon Icon="@Icons.Material.Rounded.Warehouse" Size="MudBlazor.Size.Small" Style="color: #3b82f6;" />
+                                <MudText Typo="MudBlazor.Typo.body2" Style="font-weight: 800; color: #1e293b;">
+                                    @(!string.IsNullOrEmpty(_requisition.ToWarehouseName) ? _requisition.ToWarehouseName : (!string.IsNullOrEmpty(_requisition.WarehouseName) ? _requisition.WarehouseName : "المخزن الرئيسي"))
+                                </MudText>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-3 rounded-xl border d-flex flex-column justify-center" Elevation="0" Style="background: #f8fafc; border-color: #e2e8f0; height: 100%;">
+                            <MudText Typo="MudBlazor.Typo.caption" Color="MudBlazor.Color.Secondary" Style="font-weight: 700;">تاريخ التوريد المطلوب</MudText>
+                            <div class="d-flex align-center gap-2 mt-1">
+                                <MudIcon Icon="@Icons.Material.Rounded.Event" Size="MudBlazor.Size.Small" Style="color: #10b981;" />
+                                <MudText Typo="MudBlazor.Typo.body2" Style="font-weight: 800; color: #1e293b;">
+                                    @(_requisition.RequestedDeliveryDate?.ToString("yyyy-MM-dd") ?? _requisition.RequiredDate?.ToString("yyyy-MM-dd") ?? "غير محدد")
+                                </MudText>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudPaper Class="pa-3 rounded-xl border d-flex flex-column justify-center" Elevation="0" Style="background: #f8fafc; border-color: #e2e8f0; height: 100%;">
+                            <MudText Typo="MudBlazor.Typo.caption" Color="MudBlazor.Color.Secondary" Style="font-weight: 700;">تاريخ الإرسال</MudText>
+                            <div class="d-flex align-center gap-2 mt-1">
+                                <MudIcon Icon="@Icons.Material.Rounded.Schedule" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Info" />
+                                <MudText Typo="MudBlazor.Typo.body2" Style="font-weight: 800; color: #1e293b;">
+                                    @(_requisition.SubmittedAt?.ToString("yyyy-MM-dd hh:mm tt") ?? _requisition.RequestDate.ToString("yyyy-MM-dd hh:mm tt"))
+                                </MudText>
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                @if (!string.IsNullOrWhiteSpace(_requisition.Notes))
+                {
+                    <MudAlert Severity="MudBlazor.Severity.Info" Variant="MudBlazor.Variant.Outlined" Class="mb-3 rounded-xl" Dense="true">
+                        <b>ملاحظات الفرع:</b> @_requisition.Notes
+                    </MudAlert>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_requisition.RejectionReason))
+                {
+                    <MudAlert Severity="MudBlazor.Severity.Error" Variant="MudBlazor.Variant.Filled" Class="mb-3 rounded-xl" Dense="true">
+                        <b>سبب الرفض:</b> @_requisition.RejectionReason
+                    </MudAlert>
+                }
+
+                <!-- Lines Table Header & Quick Action -->
+                <div class="d-flex align-center justify-space-between mb-2 mt-2">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Rounded.Checklist" Color="MudBlazor.Color.Warning" Size="MudBlazor.Size.Small" />
+                        <MudText Typo="MudBlazor.Typo.subtitle1" Style="font-weight: 800; color: #0f172a;">
+                            أصناف الطلبية (@_requisition.Lines.Count صنف)
+                        </MudText>
+                    </div>
+
+                    @if (_requisition.Status == 2 || _requisition.Status == 3)
+                    {
+                        <MudButton Size="MudBlazor.Size.Small" Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Warning"
+                                   StartIcon="@Icons.Material.Rounded.AutoFixHigh" OnClick="FillAllWithRequestedQty"
+                                   Style="border-radius: 8px; font-weight: 700;">
+                            تعبئة الكميات المعتمدة بالمطلوبة
+                        </MudButton>
+                    }
+                </div>
+
+                <!-- Modern Lines Table without Arrows -->
+                <MudTable Items="_requisition.Lines" Dense="true" Bordered="false" Striped="true" Elevation="0"
+                          Class="rounded-xl border mb-3 overflow-hidden" Style="border-color: #e2e8f0;">
+                    <HeaderContent>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #475569; width: 40px; text-align: center;">#</MudTh>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #475569;">اسم الصنف</MudTh>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #475569; text-align: center;">الوحدة</MudTh>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #475569; text-align: center;">الكمية المطلوبة</MudTh>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #475569; text-align: center;">الكمية المعتمدة</MudTh>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #475569; text-align: center;">الكمية المشحونة</MudTh>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #10b981; text-align: center;">المتاح في المخزن</MudTh>
+                        <MudTh Style="background: #f8fafc; font-weight: 800; color: #475569;">ملاحظات</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Style="text-align: center; font-weight: 700; color: #94a3b8;">
+                            @(_requisition.Lines.IndexOf(context) + 1)
+                        </MudTd>
+                        <MudTd>
+                            <span style="font-weight: 800; color: #1e293b;">@context.ProductName</span>
+                        </MudTd>
+                        <MudTd Style="text-align: center;">
+                            <MudChip T="string" Size="MudBlazor.Size.Small" Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Default" Style="font-weight: 600;">
+                                @context.UnitName
+                            </MudChip>
+                        </MudTd>
+                        <MudTd Style="text-align: center;">
+                            <span class="pa-1 px-3 rounded-lg" style="background: #e0f2fe; color: #0284c7; font-weight: 900; font-size: 0.95rem;">
+                                @context.RequestedQty.ToString("N2")
+                            </span>
+                        </MudTd>
+                        <MudTd Style="text-align: center;">
+                            @if (_requisition.Status == 2 || _requisition.Status == 3)
+                            {
+                                <MudNumericField T="decimal?" @bind-Value="context.ApprovedQty"
+                                                 Variant="MudBlazor.Variant.Outlined"
+                                                 Margin="MudBlazor.Margin.Dense"
+                                                 Min="0m"
+                                                 HideSpinButtons="true"
+                                                 Format="N2"
+                                                 Style="width: 100px; margin: 0 auto; text-align: center; font-weight: 800; border-radius: 8px;" />
+                            }
+                            else
+                            {
+                                <span style="font-weight: 800; color: #16a34a;">
+                                    @(context.ApprovedQty.HasValue ? context.ApprovedQty.Value.ToString("N2") : "-")
+                                </span>
+                            }
+                        </MudTd>
+                        <MudTd Style="text-align: center;">
+                            @if (_requisition.Status == 5)
+                            {
+                                <MudNumericField T="decimal?" @bind-Value="context.DispatchedQty"
+                                                 Variant="MudBlazor.Variant.Outlined"
+                                                 Margin="MudBlazor.Margin.Dense"
+                                                 Min="0m"
+                                                 HideSpinButtons="true"
+                                                 Format="N2"
+                                                 Style="width: 100px; margin: 0 auto; text-align: center; font-weight: 800; border-radius: 8px;" />
+                            }
+                            else
+                            {
+                                <span style="font-weight: 800; color: #ea580c;">
+                                    @(context.DispatchedQty.HasValue ? context.DispatchedQty.Value.ToString("N2") : "-")
+                                </span>
+                            }
+                        </MudTd>
+                        <MudTd Style="text-align: center;">
+                            <span class="pa-1 px-3 rounded-lg" style="background: @(context.AvailableInWarehouse >= context.RequestedQty ? "#ecfdf5" : "#fef2f2"); color: @(context.AvailableInWarehouse >= context.RequestedQty ? "#16a34a" : "#dc2626"); font-weight: 800; font-size: 0.95rem;">
+                                @(context.AvailableInWarehouse.HasValue ? context.AvailableInWarehouse.Value.ToString("N2") : "-")
+                            </span>
+                        </MudTd>
+                        <MudTd>
+                            <span class="text-muted" style="font-size: 0.85rem;">@(string.IsNullOrEmpty(context.Notes) ? "-" : context.Notes)</span>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+
+                <!-- Reroute Panel with Single Warehouse Guard & RTL Fixed Input -->
+                @if (_showReroutePanel)
+                {
+                    <MudPaper Class="pa-4 mb-3 rounded-2xl border" Elevation="0" Style="background: #fffbeb; border: 1.5px solid #fde68a;">
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <div class="pa-2 rounded-lg" style="background: #fef3c7; color: #b45309;">
+                                <MudIcon Icon="@Icons.Material.Rounded.SwapHoriz" Size="MudBlazor.Size.Small" />
+                            </div>
+                            <MudText Typo="MudBlazor.Typo.subtitle2" Style="font-weight: 800; color: #92400e;">تحويل الطلبية لمخزن آخر</MudText>
+                        </div>
+
+                        @if (AvailableWarehouses.Count == 0)
+                        {
+                            <div class="pa-3 rounded-xl d-flex align-center gap-3 mb-2" style="background: #ffffff; border: 1.5px dashed #f59e0b;">
+                                <MudIcon Icon="@Icons.Material.Rounded.Info" Color="MudBlazor.Color.Warning" Size="MudBlazor.Size.Large" />
+                                <div>
+                                    <MudText Typo="MudBlazor.Typo.body2" Style="font-weight: 900; color: #92400e; font-size: 0.95rem;">
+                                        لا يوجد غير مخزن رئيسي واحد فقط في النظام
+                                    </MudText>
+                                    <MudText Typo="MudBlazor.Typo.caption" Style="color: #b45309; font-weight: 600;">
+                                        لا توجد مخازن أخرى مسجلة يمكن إعادة توجيه هذا الطلب إليها حالياً.
+                                    </MudText>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-end mt-2">
+                                <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Default"
+                                           OnClick="@(() => _showReroutePanel = false)" Style="border-radius: 8px; font-weight: 700;">
+                                    إغلاق النافذة
+                                </MudButton>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3">
+                                <MudText Typo="MudBlazor.Typo.caption" Style="font-weight: 800; color: #78350f; display: block; margin-bottom: 6px; font-size: 0.85rem;">
+                                    المخزن البديل المراد التحويل إليه:
+                                </MudText>
+                                <MudSelect T="int?" @bind-Value="_newWarehouseId"
+                                           Dense="true"
+                                           Margin="MudBlazor.Margin.Dense"
+                                           AnchorOrigin="Origin.BottomCenter"
+                                           TransformOrigin="Origin.TopCenter"
+                                           Placeholder="-- اضغط لاختيار المخزن البديل --"
+                                           Class="bg-white rounded-lg"
+                                           Style="font-weight: 700; direction: rtl; text-align: right; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 12px;">
+                                    @foreach (var w in AvailableWarehouses)
+                                    {
+                                        <MudSelectItem T="int?" Value="@((int?)w.Id)">
+                                            <div class="d-flex align-center gap-2">
+                                                <MudIcon Icon="@Icons.Material.Rounded.Warehouse" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Warning" />
+                                                <span>@w.Name</span>
+                                            </div>
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
+                            <div class="d-flex gap-2 justify-end">
+                                <MudButton Variant="MudBlazor.Variant.Text" OnClick="@(() => _showReroutePanel = false)">إلغاء</MudButton>
+                                <MudButton Color="MudBlazor.Color.Warning" Variant="MudBlazor.Variant.Filled"
+                                           OnClick="ExecuteReroute" Disabled="@(_acting || _newWarehouseId == null)" Style="border-radius: 8px; font-weight: 800;">
+                                    تأكيد التحويل
+                                </MudButton>
+                            </div>
+                        }
+                    </MudPaper>
+                }
+
+                @if (_showRejectPanel)
+                {
+                    <MudPaper Class="pa-4 mb-3 rounded-2xl border" Elevation="0" Style="background: #fef2f2; border: 1.5px solid #fecaca;">
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <div class="pa-2 rounded-lg" style="background: #fee2e2; color: #dc2626;">
+                                <MudIcon Icon="@Icons.Material.Rounded.Cancel" Size="MudBlazor.Size.Small" />
+                            </div>
+                            <MudText Typo="MudBlazor.Typo.subtitle2" Style="font-weight: 800; color: #991b1b;">رفض طلب التوريد</MudText>
+                        </div>
+                        <MudText Typo="MudBlazor.Typo.caption" Style="font-weight: 800; color: #7f1d1d; display: block; margin-bottom: 6px;">
+                            سبب الرفض:
+                        </MudText>
+                        <MudTextField T="string" @bind-Value="_rejectReason" Placeholder="اكتب توضيح سبب الرفض للفرع..." Lines="2"
+                                      Variant="MudBlazor.Variant.Outlined" Margin="MudBlazor.Margin.Dense" Class="bg-white rounded-lg" Style="direction: rtl;" />
+                        <div class="d-flex gap-2 mt-3 justify-end">
+                            <MudButton Variant="MudBlazor.Variant.Text" OnClick="@(() => _showRejectPanel = false)">إلغاء</MudButton>
+                            <MudButton Color="MudBlazor.Color.Error" Variant="MudBlazor.Variant.Filled"
+                                       OnClick="ExecuteReject" Disabled="_acting" Style="border-radius: 8px; font-weight: 700;">
+                                تأكيد الرفض
+                            </MudButton>
+                        </div>
+                    </MudPaper>
+                }
+
+                @if (_showDispatchNotesPanel)
+                {
+                    <MudPaper Class="pa-4 mb-3 rounded-2xl border" Elevation="0" Style="background: #fff7ed; border: 1.5px solid #fed7aa;">
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <div class="pa-2 rounded-lg" style="background: #ffedd5; color: #ea580c;">
+                                <MudIcon Icon="@Icons.Material.Rounded.LocalShipping" Size="MudBlazor.Size.Small" />
+                            </div>
+                            <MudText Typo="MudBlazor.Typo.subtitle2" Style="font-weight: 800; color: #9a3412;">تأكيد شحن البضاعة للفرع</MudText>
+                        </div>
+                        <MudText Typo="MudBlazor.Typo.caption" Style="font-weight: 800; color: #7c2d12; display: block; margin-bottom: 6px;">
+                            ملاحظات الشحن أو رقم البوليصة:
+                        </MudText>
+                        <MudTextField T="string" @bind-Value="_dispatchNotes" Placeholder="أدخل تفاصيل شركة الشحن، السائق، أو رقم البوليصة..." Lines="2"
+                                      Variant="MudBlazor.Variant.Outlined" Margin="MudBlazor.Margin.Dense" Class="bg-white rounded-lg" Style="direction: rtl;" />
+                        <div class="d-flex gap-2 mt-3 justify-end">
+                            <MudButton Variant="MudBlazor.Variant.Text" OnClick="@(() => _showDispatchNotesPanel = false)">إلغاء</MudButton>
+                            <MudButton Color="MudBlazor.Color.Warning" Variant="MudBlazor.Variant.Filled"
+                                       OnClick="ExecuteDispatch" Disabled="_acting" Style="border-radius: 8px; font-weight: 700;">
+                                تأكيد بدء الشحن
+                            </MudButton>
+                        </div>
+                    </MudPaper>
+                }
+
+                @if (_showReceiveNotesPanel)
+                {
+                    <MudPaper Class="pa-4 mb-3 rounded-2xl border" Elevation="0" Style="background: #f0fdf4; border: 1.5px solid #bbf7d0;">
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <div class="pa-2 rounded-lg" style="background: #dcfce7; color: #16a34a;">
+                                <MudIcon Icon="@Icons.Material.Rounded.DoneAll" Size="MudBlazor.Size.Small" />
+                            </div>
+                            <MudText Typo="MudBlazor.Typo.subtitle2" Style="font-weight: 800; color: #166534;">تأكيد استلام الطلبية بالفرع (إدارياً)</MudText>
+                        </div>
+                        <MudAlert Severity="MudBlazor.Severity.Info" Dense="true" Class="mb-3 rounded-lg" Variant="MudBlazor.Variant.Outlined">
+                            الأصل أن يقوم الفرع بتأكيد الاستلام من شاشة (طلبات الفروع) لديه. هذا الخيار متاح هنا لإدارة المخزن للتأكيد نيابة عن الفرع وتحديث رصيد مخزن الفرع تلقائياً.
+                        </MudAlert>
+                        <MudText Typo="MudBlazor.Typo.caption" Style="font-weight: 800; color: #14532d; display: block; margin-bottom: 6px;">
+                            ملاحظات الاستلام:
+                        </MudText>
+                        <MudTextField T="string" @bind-Value="_receiveNotes" Placeholder="ملاحظات حول حالة الأصناف عند الاستلام..." Lines="2"
+                                      Variant="MudBlazor.Variant.Outlined" Margin="MudBlazor.Margin.Dense" Class="bg-white rounded-lg" Style="direction: rtl;" />
+                        <div class="d-flex gap-2 mt-3 justify-end">
+                            <MudButton Variant="MudBlazor.Variant.Text" OnClick="@(() => _showReceiveNotesPanel = false)">إلغاء</MudButton>
+                            <MudButton Color="MudBlazor.Color.Success" Variant="MudBlazor.Variant.Filled"
+                                       OnClick="ExecuteReceive" Disabled="_acting" Style="border-radius: 8px; font-weight: 700;">
+                                تأكيد الاستلام وتحديث مخزون الفرع
+                            </MudButton>
+                        </div>
+                    </MudPaper>
+                }
+            }
+        </div>
+    </DialogContent>
+
+    <DialogActions>
+        <div class="d-flex justify-space-between align-center w-100 pa-2 px-3">
+            <MudButton OnClick="Cancel" Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Default" Style="border-radius: 10px; font-weight: 700;">
+                إغلاق
+            </MudButton>
+
+            @if (_requisition != null)
+            {
+                <div class="d-flex gap-2 align-center flex-wrap">
+                    @if (_requisition.Status == 2) @* Submitted *@
+                    {
+                        <MudButton Color="MudBlazor.Color.Error" Variant="MudBlazor.Variant.Outlined"
+                                   StartIcon="@Icons.Material.Rounded.Cancel"
+                                   OnClick="@(() => { _showRejectPanel = !_showRejectPanel; _showReroutePanel = false; })"
+                                   Style="border-radius: 10px; font-weight: 700;">
+                            رفض
+                        </MudButton>
+                        <MudButton Color="MudBlazor.Color.Warning" Variant="MudBlazor.Variant.Outlined"
+                                   StartIcon="@Icons.Material.Rounded.SwapHoriz"
+                                   OnClick="@(() => { _showReroutePanel = !_showReroutePanel; _showRejectPanel = false; })"
+                                   Style="border-radius: 10px; font-weight: 700;">
+                            تحويل لمخزن آخر
+                        </MudButton>
+                        <MudButton Color="MudBlazor.Color.Info" Variant="MudBlazor.Variant.Filled"
+                                   StartIcon="@Icons.Material.Rounded.Tune"
+                                   OnClick="ProposeModification" Disabled="_acting"
+                                   Style="border-radius: 10px; font-weight: 700;">
+                            مراجعة وتعديل الكميات
+                        </MudButton>
+                        <MudButton Color="MudBlazor.Color.Success" Variant="MudBlazor.Variant.Filled"
+                                   StartIcon="@Icons.Material.Rounded.CheckCircle"
+                                   OnClick="DirectApprove" Disabled="_acting"
+                                   Style="border-radius: 10px; font-weight: 800; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);">
+                            اعتماد مباشر
+                        </MudButton>
+                    }
+                    else if (_requisition.Status == 3) @* UnderReview *@
+                    {
+                        <MudButton Color="MudBlazor.Color.Info" Variant="MudBlazor.Variant.Filled"
+                                   StartIcon="@Icons.Material.Rounded.Tune"
+                                   OnClick="ProposeModification" Disabled="_acting"
+                                   Style="border-radius: 10px; font-weight: 700;">
+                            إرسال المقترح للفرع
+                        </MudButton>
+                        <MudButton Color="MudBlazor.Color.Success" Variant="MudBlazor.Variant.Filled"
+                                   StartIcon="@Icons.Material.Rounded.CheckCircle"
+                                   OnClick="DirectApprove" Disabled="_acting"
+                                   Style="border-radius: 10px; font-weight: 800;">
+                            اعتماد مباشر
+                        </MudButton>
+                    }
+                    else if (_requisition.Status == 4) @* ModificationProposed *@
+                    {
+                        <MudButton Color="MudBlazor.Color.Success" Variant="MudBlazor.Variant.Filled"
+                                   StartIcon="@Icons.Material.Rounded.CheckCircle"
+                                   OnClick="AcceptModification" Disabled="_acting"
+                                   Style="border-radius: 10px; font-weight: 800;">
+                            اعتماد المقترح
+                        </MudButton>
+                    }
+                    else if (_requisition.Status == 5) @* Approved *@
+                    {
+                        <MudButton Color="MudBlazor.Color.Warning" Variant="MudBlazor.Variant.Filled"
+                                   StartIcon="@Icons.Material.Rounded.LocalShipping"
+                                   OnClick="@(() => { _showDispatchNotesPanel = !_showDispatchNotesPanel; })" Disabled="_acting"
+                                   Style="border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, #f97316, #ea580c); color: white;">
+                            بدء الشحن (Dispatch)
+                        </MudButton>
+                    }
+                    else if (_requisition.Status == 8) @* InTransit *@
+                    {
+                        <MudButton Color="MudBlazor.Color.Success" Variant="MudBlazor.Variant.Filled"
+                                   StartIcon="@Icons.Material.Rounded.DoneAll"
+                                   OnClick="@(() => { _showReceiveNotesPanel = !_showReceiveNotesPanel; })" Disabled="_acting"
+                                   Style="border-radius: 10px; font-weight: 800;">
+                            تأكيد استلام الفرع (إدارياً)
+                        </MudButton>
+                    }
+                </div>
+            }
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@if (_showPrintPreview && _requisition != null)
+{
+    <div class="wh-print-overlay" @onclick="@(() => _showPrintPreview = false)">
+        <div class="wh-print-dialog-card" @onclick:stopPropagation="true">
+            <div class="wh-print-dialog-header no-print">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Rounded.Inventory2" Color="MudBlazor.Color.Warning" />
+                    <MudText Typo="Typo.h6" Style="font-weight: 800; color: #0f172a;">معاينة وطباعة إذن طلبية التوريد - @_requisition.RequisitionNumber</MudText>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudButton Variant="MudBlazor.Variant.Filled" Color="MudBlazor.Color.Warning"
+                               StartIcon="@Icons.Material.Filled.Print" OnClick="PrintReport" Style="font-weight: 800; border-radius: 8px;">
+                        طباعة الآن
+                    </MudButton>
+                    <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Success"
+                               StartIcon="@Icons.Material.Filled.TableChart" OnClick="ExportExcel" Style="font-weight: 700; border-radius: 8px;">
+                        تصدير إكسيل (.xlsx)
+                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Rounded.Close" OnClick="@(() => _showPrintPreview = false)" />
+                </div>
+            </div>
+
+            <div class="wh-print-dialog-body">
+                <div class="wh-printable-sheet" dir="rtl">
+                    <!-- Clean Header (Voucher Title Only) -->
+                    <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px;">
+                        <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 1.4rem;">إذن طلبية توريد فرع (@_requisition.RequisitionNumber)</h2>
+                        <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.85rem;">
+                            الفرع الطالب: <strong>@(!string.IsNullOrEmpty(_requisition.FromBranchName) ? _requisition.FromBranchName : _requisition.BranchName)</strong> |
+                            المخزن المورد: <strong>@(!string.IsNullOrEmpty(_requisition.ToWarehouseName) ? _requisition.ToWarehouseName : _requisition.WarehouseName)</strong> |
+                            تاريخ: @_requisition.RequestDate.ToString("yyyy/MM/dd hh:mm tt")
+                        </p>
+                    </div>
+
+                    <!-- Table of Items -->
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 24px;">
+                        <thead>
+                            <tr style="background: #0f172a; color: white;">
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">#</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">اسم الصنف</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">الوحدة</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">الكمية المطلوبة</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">الكمية المعتمدة</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">المشحونة</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">المستلمة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ int rlIdx = 1; }
+                            @foreach (var line in _requisition.Lines)
+                            {
+                                <tr style="background: @(rlIdx % 2 == 0 ? "#f8fafc" : "#ffffff");">
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center;">@rlIdx</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; font-weight: 700;">@line.ProductName</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center;">@line.UnitName</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">@line.RequestedQuantity.ToString("0.##")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center; color: #16a34a; font-weight: 700;">@(line.ApprovedQuantity?.ToString("0.##") ?? "-")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center; color: #ea580c; font-weight: 700;">@(line.DispatchedQuantity?.ToString("0.##") ?? "-")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center; color: #2563eb; font-weight: 700;">@(line.ReceivedQuantity?.ToString("0.##") ?? "-")</td>
+                                </tr>
+                                rlIdx++;
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (!string.IsNullOrWhiteSpace(_requisition.Notes))
+                    {
+                        <div style="margin-bottom: 20px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem;">
+                            <strong>ملاحظات:</strong> @_requisition.Notes
+                        </div>
+                    }
+
+                    <!-- Signatures -->
+                    <div style="display: flex; justify-content: space-around; margin-top: 24px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                        <div style="text-align: center; width: 220px;">
+                            <span style="font-weight: 700; color: #475569; display: block; margin-bottom: 24px;">أمين المستودع (الصارف)</span>
+                            <span style="border-top: 1px solid #94a3b8; display: block; padding-top: 4px;">التوقيع: .....................</span>
+                        </div>
+                        <div style="text-align: center; width: 220px;">
+                            <span style="font-weight: 700; color: #475569; display: block; margin-bottom: 24px;">المستلم بالفرع / السائق</span>
+                            <span style="border-top: 1px solid #94a3b8; display: block; padding-top: 4px;">التوقيع: .....................</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int RequisitionId { get; set; }
+
+    private bool IsArabic => LocalizerService.GetCurrentLanguage() == "ar";
+    private bool _loading = true;
+    private bool _acting = false;
+
+    private RequisitionDetailDto? _requisition;
+    private List<StatusHistoryDto> _history = new();
+    private List<WarehouseLookup> _warehouses = new();
+
+    private List<WarehouseLookup> AvailableWarehouses => _warehouses
+        .Where(w => _requisition == null || (w.Id != _requisition.TargetWarehouseId && w.Id != _requisition.ReroutedToWarehouseId))
+        .ToList();
+
+    private bool _showReroutePanel;
+    private bool _showRejectPanel;
+    private bool _showDispatchNotesPanel;
+    private bool _showReceiveNotesPanel;
+
+    private int? _newWarehouseId;
+    private string _rejectReason = string.Empty;
+    private string _rejectionReason = string.Empty;
+    private string _dispatchNotes = string.Empty;
+    private string _receiveNotes = string.Empty;
+    private bool _showPrintPreview = false;
+
+    private async Task PrintReport()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("printReportElement", ".wh-printable-sheet");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ أثناء فتح الطباعة: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private void ExportExcel()
+    {
+        if (_requisition == null || !_requisition.Lines.Any())
+        {
+            Snackbar.Add("لا توجد بنود للتصدير", MudBlazor.Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var lines = _requisition.Lines.Select(l => new
+            {
+                ProductName = l.ProductName,
+                UnitName = l.UnitName,
+                RequestedQty = l.RequestedQuantity,
+                ApprovedQty = l.ApprovedQuantity,
+                DispatchedQty = l.DispatchedQuantity,
+                ReceivedQty = l.ReceivedQuantity
+            }).Cast<dynamic>().ToList();
+
+            var fromBranch = !string.IsNullOrEmpty(_requisition.FromBranchName) ? _requisition.FromBranchName : (_requisition.BranchName ?? "الفرع");
+            var toWarehouse = !string.IsNullOrEmpty(_requisition.ToWarehouseName) ? _requisition.ToWarehouseName : (_requisition.WarehouseName ?? "المخزن");
+
+            var bytes = WarehouseExcelExportHelper.GenerateRequisitionDetails(
+                _requisition.RequisitionNumber,
+                fromBranch,
+                toWarehouse,
+                _requisition.RequestDate,
+                GetStatusLabel(_requisition.Status),
+                lines);
+
+            var defaultFileName = $"طلب_توريد_{_requisition.RequisitionNumber}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+            var savedPath = PrintingService.SaveFile(bytes, defaultFileName, "Excel Files (*.xlsx)|*.xlsx", "حفظ تفاصيل الطلبية", true);
+
+            if (!string.IsNullOrEmpty(savedPath))
+            {
+                Snackbar.Add($"تم حفظ ملف الإكسيل بنجاح: {System.IO.Path.GetFileName(savedPath)}", MudBlazor.Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"فشل التصدير: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            _requisition = await Http.GetFromJsonAsync<RequisitionDetailDto>($"/api/warehouse/requisitions/{RequisitionId}");
+            
+            // Prefill approved and received qty if not yet set
+            if (_requisition != null && _requisition.Lines != null)
+            {
+                foreach (var line in _requisition.Lines)
+                {
+                    if ((line.ApprovedQty == null || line.ApprovedQty == 0) && line.RequestedQty > 0)
+                    {
+                        line.ApprovedQty = line.RequestedQty;
+                    }
+                }
+            }
+
+            try
+            {
+                // API returns { StockLines: [...] } wrapper object
+                var stockResponse = await Http.GetFromJsonAsync<StockInfoResponse>($"/api/warehouse/requisitions/{RequisitionId}/stock-info");
+                var stockInfo = stockResponse?.StockLines;
+                if (stockInfo != null && _requisition?.Lines != null)
+                {
+                    foreach (var line in _requisition.Lines)
+                    {
+                        var si = stockInfo.FirstOrDefault(s => s.LineId == line.Id || s.ProductId == line.ProductId);
+                        if (si != null)
+                        {
+                            line.AvailableInWarehouse = si.AvailableInWarehouse;
+                        }
+                    }
+                }
+            }
+            catch (Exception stockEx)
+            {
+                Snackbar.Add($"تنبيه: لم يتم تحميل بيانات المخزون: {stockEx.Message}", MudBlazor.Severity.Warning);
+            }
+
+            try {
+                _warehouses = await Http.GetFromJsonAsync<List<WarehouseLookup>>("/api/warehouses") ?? new();
+            } catch { }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ في تحميل تفاصيل الطلبية: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void FillAllWithRequestedQty()
+    {
+        if (_requisition?.Lines == null) return;
+        foreach (var line in _requisition.Lines)
+        {
+            line.ApprovedQty = line.RequestedQty;
+        }
+        StateHasChanged();
+        Snackbar.Add("تم تعبئة جميع الكميات المعتمدة بالمطلوبة", MudBlazor.Severity.Info);
+    }
+
+    private async Task StartReview()
+    {
+        await CallApi($"/api/warehouse/requisitions/{RequisitionId}/review", HttpMethod.Post, null, "تم بدء المراجعة");
+    }
+
+    private async Task DirectApprove()
+    {
+        await CallApi($"/api/warehouse/requisitions/{RequisitionId}/approve", HttpMethod.Post, null, "تم اعتماد طلب التوريد بنجاح");
+    }
+
+    private async Task ProposeModification()
+    {
+        var lines = _requisition!.Lines
+            .Select(l => new { lineId = l.Id, proposedQuantity = l.ApprovedQty ?? l.RequestedQty, notes = l.Notes })
+            .ToList();
+        await CallApi($"/api/warehouse/requisitions/{RequisitionId}/propose", HttpMethod.Post, lines, "تم اقتراح تعديل الكميات بنجاح");
+    }
+
+    private async Task AcceptModification()
+    {
+        await DirectApprove();
+    }
+
+    private async Task RejectModification()
+    {
+        await ExecuteReject();
+    }
+
+    private async Task ExecuteReroute()
+    {
+        if (_newWarehouseId is null) { Snackbar.Add("يرجى اختيار المخزن", MudBlazor.Severity.Warning); return; }
+        await CallApi($"/api/warehouse/requisitions/{RequisitionId}/reroute", HttpMethod.Post,
+            new { targetWarehouseId = _newWarehouseId.Value, reason = "تحويل من إدارة المخزن" }, "تم تحويل الطلب لمخزن آخر");
+        _showReroutePanel = false;
+    }
+
+    private async Task ExecuteDispatch()
+    {
+        var lines = _requisition!.Lines
+            .Select(l => new { lineId = l.Id, dispatchedQuantity = l.DispatchedQty ?? l.ApprovedQty ?? l.RequestedQty })
+            .ToList();
+        await CallApi($"/api/warehouse/requisitions/{RequisitionId}/dispatch", HttpMethod.Post,
+            new { lines = lines, userId = "Warehouse Admin" }, "تم بدء شحن الطلبية");
+        _showDispatchNotesPanel = false;
+    }
+
+    private async Task ExecuteReceive()
+    {
+        var lines = _requisition!.Lines
+            .Select(l => new {
+                lineId = l.Id,
+                receivedQuantity = (l.ReceivedQty.HasValue && l.ReceivedQty.Value > 0)
+                    ? l.ReceivedQty.Value
+                    : ((l.DispatchedQty.HasValue && l.DispatchedQty.Value > 0) ? l.DispatchedQty.Value : ((l.ApprovedQty.HasValue && l.ApprovedQty.Value > 0) ? l.ApprovedQty.Value : l.RequestedQty))
+            })
+            .ToList();
+        await CallApi($"/api/warehouse/requisitions/{RequisitionId}/receive", HttpMethod.Post,
+            new { lines = lines, userId = "Warehouse Admin" }, "تم تأكيد الاستلام وتحديث المخزون");
+        _showReceiveNotesPanel = false;
+    }
+
+    private async Task ExecuteReject()
+    {
+        if (string.IsNullOrWhiteSpace(_rejectReason)) { Snackbar.Add("يرجى إدخال سبب الرفض", MudBlazor.Severity.Warning); return; }
+        await CallApi($"/api/warehouse/requisitions/{RequisitionId}/reject", HttpMethod.Post,
+            new { reason = _rejectReason }, "تم رفض الطلبية");
+        _showRejectPanel = false;
+    }
+
+    private async Task CallApi(string url, HttpMethod method, object? body, string successMsg)
+    {
+        _acting = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (method == HttpMethod.Post)
+                response = await Http.PostAsJsonAsync(url, body ?? new { });
+            else if (method == HttpMethod.Put)
+                response = await Http.PutAsJsonAsync(url, body ?? new { });
+            else
+                response = await Http.SendAsync(new HttpRequestMessage(method, url));
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(successMsg, MudBlazor.Severity.Success);
+                await LoadData();
+            }
+            else
+            {
+                var err = await response.Content.ReadAsStringAsync();
+                string displayErr = err;
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(err);
+                    if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                        displayErr = msgProp.GetString() ?? err;
+                }
+                catch { }
+                Snackbar.Add(displayErr, MudBlazor.Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            _acting = false;
+        }
+    }
+
+    private Color GetStatusColor(int status) => status switch
+    {
+        2 => MudBlazor.Color.Info,
+        3 => MudBlazor.Color.Warning,
+        4 => MudBlazor.Color.Secondary,
+        5 => MudBlazor.Color.Success,
+        7 => MudBlazor.Color.Primary,
+        8 => MudBlazor.Color.Warning,
+        9 => MudBlazor.Color.Success,
+        10 => MudBlazor.Color.Error,
+        11 => MudBlazor.Color.Default,
+        _ => MudBlazor.Color.Default
+    };
+
+    private Color GetStatusColor(string status) => int.TryParse(status, out var s) ? GetStatusColor(s) : MudBlazor.Color.Default;
+
+    private string GetStatusLabel(int status) => status switch
+    {
+        0 => "معلق للمزامنة",
+        1 => "مسودة",
+        2 => "جديد (مرسل)",
+        3 => "قيد المراجعة",
+        4 => "تعديل مقترح",
+        5 => "معتمد",
+        6 => "محول",
+        7 => "قيد التجهيز",
+        8 => "في الطريق",
+        9 => "مستلم",
+        10 => "مرفوض",
+        11 => "ملغي",
+        _ => $"حالة {status}"
+    };
+
+    private string GetStatusLabel(string status) => int.TryParse(status, out var s) ? GetStatusLabel(s) : status;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private class WarehouseLookup
+    {
+        public int Id { get; set; }
+        public string? Code { get; set; }
+        public string? NameAr { get; set; }
+        public string? NameEn { get; set; }
+        public string Name => !string.IsNullOrWhiteSpace(NameAr) ? NameAr : (!string.IsNullOrWhiteSpace(NameEn) ? NameEn : $"مخزن #{Id}");
+    }
+
+    private class RequisitionDetailDto
+    {
+        public int Id { get; set; }
+        public string RequisitionNumber { get; set; } = string.Empty;
+        public int Status { get; set; }
+        public int TargetWarehouseId { get; set; }
+        public int? ReroutedToWarehouseId { get; set; }
+        public string? FromBranchName { get; set; }
+        public string? BranchName { get; set; }
+        public string? ToWarehouseName { get; set; }
+        public string? WarehouseName { get; set; }
+        public DateTime? RequestedDeliveryDate { get; set; }
+        public DateTime? RequiredDate { get; set; }
+        public DateTime? SubmittedAt { get; set; }
+        public DateTime RequestDate { get; set; }
+        public string Priority { get; set; } = "Normal";
+        public string? Notes { get; set; }
+        public string? RejectionReason { get; set; }
+        public List<RequisitionLineDetailDto> Lines { get; set; } = new();
+    }
+
+    private class RequisitionLineDetailDto
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public int UnitId { get; set; }
+        public string UnitName { get; set; } = string.Empty;
+        public decimal RequestedQuantity { get; set; }
+        public decimal RequestedQty { get => RequestedQuantity; set => RequestedQuantity = value; }
+        public decimal? ProposedQuantity { get; set; }
+        public decimal? ProposedQty { get => ProposedQuantity; set => ProposedQuantity = value; }
+        public decimal? ApprovedQuantity { get; set; }
+        public decimal? ApprovedQty { get => ApprovedQuantity; set => ApprovedQuantity = value; }
+        public decimal? DispatchedQuantity { get; set; }
+        public decimal? DispatchedQty { get => DispatchedQuantity; set => DispatchedQuantity = value; }
+        public decimal? ReceivedQuantity { get; set; }
+        public decimal? ReceivedQty { get => ReceivedQuantity; set => ReceivedQuantity = value; }
+        public decimal? AvailableInWarehouse { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    private class StockInfoResponse
+    {
+        public int RequisitionId { get; set; }
+        public string? RequisitionNumber { get; set; }
+        public string? WarehouseName { get; set; }
+        public List<StockInfoDto>? StockLines { get; set; }
+    }
+
+    private record StockInfoDto(int LineId, int ProductId, string? ProductName, decimal RequestedQuantity, decimal? ProposedQuantity, string? UnitName, decimal AvailableInWarehouse, bool IsEnough, decimal Shortage);
+    private record StatusHistoryDto(string ToStatus, DateTime ChangedAt, string ChangedBy, string? Notes);
+}

@@ -1,0 +1,66 @@
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@using HQ.Desktop.Auth
+
+<aside class="side-nav @(_open ? "is-open" : "is-collapsed")" dir="rtl">
+    <div class="side-top">
+        <button class="toggle-bar" title="@(_open ? "طي القائمة" : "فتح القائمة")" @onclick="Toggle">
+            <MudIcon Icon="@(_open ? Icons.Material.Rounded.MenuOpen : Icons.Material.Rounded.Menu)" />
+        </button>
+        <div class="brand" @onclick='() => Navigation.NavigateTo("/")'>
+            <div class="logo-mark">HQ</div>
+            <div class="brand-copy">
+                <div class="brand-name">المقر الرئيسي</div>
+                <div class="brand-tag">Headquarters</div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="side-links">
+        <button class="nav-link active" title="لوحة المقارنات" @onclick='() => Navigation.NavigateTo("/")'>
+            <MudIcon Icon="@Icons.Material.Rounded.Dashboard" />
+            <span>لوحة المقارنات</span>
+        </button>
+    </nav>
+
+    <div class="side-foot">
+        <div class="user-pill" title="@_userName">
+            <div class="user-avatar">@_initials</div>
+            <span class="user-name">@_userName</span>
+        </div>
+        <button class="foot-btn" title="تسجيل الخروج" @onclick="Logout">
+            <MudIcon Icon="@Icons.Material.Rounded.Logout" Size="Size.Small" />
+            <span>خروج</span>
+        </button>
+        <button class="foot-btn danger" title="إغلاق التطبيق" @onclick="ExitApp">
+            <MudIcon Icon="@Icons.Material.Rounded.Close" Size="Size.Small" />
+            <span>إغلاق</span>
+        </button>
+    </div>
+</aside>
+
+@code {
+    private bool _open = true;
+    private string _userName = "مدير المقر";
+    private string _initials = "HQ";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        _userName = state.User.Identity?.Name ?? "مدير المقر";
+        _initials = _userName.Length >= 2 ? _userName[..2] : "HQ";
+    }
+
+    private void Toggle() => _open = !_open;
+
+    private void Logout()
+    {
+        if (AuthStateProvider is HqAuthStateProvider auth)
+            auth.SignOut();
+        Snackbar.Add("تم تسجيل الخروج", Severity.Info);
+        Navigation.NavigateTo("/login");
+    }
+
+    private static void ExitApp() => System.Windows.Application.Current.Shutdown();
+}

@@ -1,0 +1,471 @@
+﻿@page "/reports/supplier-aging"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using System.Net.Http.Json
+@using Warehouse.Desktop.Services
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject LocalizationService LocalizerService
+@inject IDesktopPrintingService PrintingService
+@inject WarehouseCurrencyService CurrencyService
+@inject IJSRuntime JS
+
+<div class="wh-page-wrapper" dir="@(IsArabic ? "rtl" : "ltr")">
+    <!-- Header -->
+    <div class="wh-page-header d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
+        <div>
+            <MudText MudBlazor.Typo="Typo.h5" Class="wh-title">
+                <MudIcon Icon="@Icons.Material.Filled.DateRange" Class="me-2" Color="MudBlazor.Color.Warning" />
+                @(IsArabic ? "تقرير ديون ومستحقات الموردين (Supplier Aging Report)" : "Supplier Aging Report")
+            </MudText>
+            <MudText MudBlazor.Typo="Typo.body2" Color="MudBlazor.Color.Secondary">
+                @(IsArabic ? "متابعة الفواتير المستحقة للموردين وجدولة السداد حسب فترات الاستحقاق والأعمار الزمنية" : "Track supplier invoices and aging debt schedules")
+            </MudText>
+        </div>
+        <div class="d-flex gap-2">
+            <MudButton Variant="MudBlazor.Variant.Filled" Color="MudBlazor.Color.Warning"
+                       StartIcon="@Icons.Material.Filled.Visibility" OnClick="OpenPrintPreview"
+                       Style="font-weight: 700; border-radius: 8px;">
+                معاينة وطباعة
+            </MudButton>
+            <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Success"
+                       StartIcon="@Icons.Material.Filled.TableChart" OnClick="ExportExcel"
+                       Style="font-weight: 700; border-radius: 8px;">
+                تصدير إكسيل (.xlsx)
+            </MudButton>
+        </div>
+    </div>
+
+    @if (_invoices.Any())
+    {
+        <!-- KPI Cards -->
+        <MudGrid Spacing="3" Class="mb-4">
+            <MudItem xs="12" sm="2">
+                <MudPaper Class="pa-4 text-center" Style="background:#ecfdf5; border:1px solid #10b981; border-radius:12px;">
+                    <MudText MudBlazor.Typo="Typo.caption" Style="color:#047857; font-weight: 700;">جارية (&lt; 30 يوم)</MudText>
+                    <MudText MudBlazor.Typo="Typo.h6" Class="fw-bold" Style="color:#065f46;">@Current30.ToString("0.##") <small style="font-size:0.6em">@_currency</small></MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudPaper Class="pa-4 text-center" Style="background:#fefce8; border:1px solid #eab308; border-radius:12px;">
+                    <MudText MudBlazor.Typo="Typo.caption" Style="color:#a16207; font-weight: 700;">متأخرة (31-60)</MudText>
+                    <MudText MudBlazor.Typo="Typo.h6" Class="fw-bold" Style="color:#854d0e;">@Overdue60.ToString("0.##") <small style="font-size:0.6em">@_currency</small></MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudPaper Class="pa-4 text-center" Style="background:#fff7ed; border:1px solid #f97316; border-radius:12px;">
+                    <MudText MudBlazor.Typo="Typo.caption" Style="color:#c2410c; font-weight: 700;">متأخرة (61-90)</MudText>
+                    <MudText MudBlazor.Typo="Typo.h6" Class="fw-bold" Style="color:#9a3412;">@Overdue90.ToString("0.##") <small style="font-size:0.6em">@_currency</small></MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudPaper Class="pa-4 text-center" Style="background:#fef2f2; border:1px solid #ef4444; border-radius:12px;">
+                    <MudText MudBlazor.Typo="Typo.caption" Style="color:#b91c1c; font-weight: 700;">حرجة (&gt; 90 يوم)</MudText>
+                    <MudText MudBlazor.Typo="Typo.h6" Class="fw-bold" Style="color:#991b1b;">@Overdue90Plus.ToString("0.##") <small style="font-size:0.6em">@_currency</small></MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudPaper Class="pa-4 text-center" Style="background:#0f172a; color:#fff; border-radius:12px;">
+                    <MudText MudBlazor.Typo="Typo.caption" Style="color:#fed7aa; font-weight: 700;">إجمالي الديون المستحقة</MudText>
+                    <MudText MudBlazor.Typo="Typo.h5" Class="fw-bold" Style="color:#fb923c;">@TotalOutstanding.ToString("N2") <small style="font-size:0.6em">@_currency</small></MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- CHARTS SECTION -->
+        <MudGrid Spacing="3" Class="mb-4">
+            <!-- 1. Debt Aging Distribution Donut -->
+            <MudItem xs="12" md="6">
+                <MudCard Elevation="1" Style="border-radius: 12px; border: 1px solid #e2e8f0; height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.PieChart" Color="MudBlazor.Color.Warning" />
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 800;">توزيع الديون حسب أعمار الاستحقاق</MudText>
+                            </div>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="d-flex justify-center py-2">
+                        @if (_agingDonutData.Any(v => v > 0))
+                        {
+                            <MudChart ChartType="ChartType.Donut" InputData="@_agingDonutData" InputLabels="@_agingDonutLabels"
+                                      Width="240px" Height="240px" />
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <!-- 2. Top Suppliers by Debt -->
+            <MudItem xs="12" md="6">
+                <MudCard Elevation="1" Style="border-radius: 12px; border: 1px solid #e2e8f0; height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Leaderboard" Color="MudBlazor.Color.Error" />
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 800;">أعلى الموردين مديونية</MudText>
+                            </div>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="py-2">
+                        @if (_topSuppliersSeries.Any())
+                        {
+                            <MudChart ChartType="ChartType.Bar" ChartSeries="@_topSuppliersSeries" XAxisLabels="@_topSuppliersLabels"
+                                      Width="100%" Height="240px" />
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Search / Filter -->
+        <MudCard Class="wh-card mb-4" Elevation="1" Style="border-radius: 12px; border: 1px solid #e2e8f0;">
+            <MudCardContent>
+                <MudTextField @bind-Value="_search" Placeholder="بحث باسم المورد أو رقم الفاتورة..."
+                              Adornment="MudBlazor.Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true" Margin="Margin.Dense" Variant="MudBlazor.Variant.Outlined" />
+            </MudCardContent>
+        </MudCard>
+
+        <!-- Table -->
+        <MudCard Class="wh-card" Elevation="1" Style="border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <MudCardContent Class="pa-0">
+                <MudTable Items="FilteredInvoices" Dense="true" Hover="true" Striped="true" FixedHeader="true" Height="480px">
+                    <HeaderContent>
+                        <MudTh>المورد</MudTh>
+                        <MudTh>رقم الفاتورة</MudTh>
+                        <MudTh>تاريخ الفاتورة</MudTh>
+                        <MudTh>تاريخ الاستحقاق</MudTh>
+                        <MudTh Style="text-align: center;">أيام التأخير</MudTh>
+                        <MudTh Style="text-align: left;">إجمالي الفاتورة</MudTh>
+                        <MudTh Style="text-align: left;">المسدد</MudTh>
+                        <MudTh Style="text-align: left;">المستحق المتبقي</MudTh>
+                        <MudTh Style="text-align: center;">الحالة</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="المورد"><b>@context.SupplierName</b></MudTd>
+                        <MudTd DataLabel="رقم الفاتورة">
+                            <MudChip T="string" Size="MudBlazor.Size.Small" Variant="MudBlazor.Variant.Outlined">@context.InvoiceNumber</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="تاريخ الفاتورة">@context.InvoiceDate.ToString("yyyy/MM/dd")</MudTd>
+                        <MudTd DataLabel="تاريخ الاستحقاق">@context.DueDate.ToString("yyyy/MM/dd")</MudTd>
+                        <MudTd DataLabel="أيام التأخير" Style="text-align: center;">
+                            @if (context.DaysOverdue > 0)
+                            {
+                                <span class="font-weight-bold" style="color: #dc2626;">@context.DaysOverdue يوم</span>
+                            }
+                            else
+                            {
+                                <span style="color: #16a34a;">جارية</span>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="إجمالي الفاتورة" Style="text-align: left;">@context.TotalAmount.ToString("N2") @_currency</MudTd>
+                        <MudTd DataLabel="المسدد" Style="text-align: left;">@context.PaidAmount.ToString("N2") @_currency</MudTd>
+                        <MudTd DataLabel="المستحق المتبقي" Style="text-align: left;">
+                            <b style="color: #ea580c; font-size: 1.05em;">@context.Outstanding.ToString("N2") @_currency</b>
+                        </MudTd>
+                        <MudTd DataLabel="الحالة" Style="text-align: center;">
+                            <MudChip T="string" Size="MudBlazor.Size.Small" Color="@GetAgingColor(context.DaysOverdue)" Variant="MudBlazor.Variant.Filled">
+                                @GetAgingLabel(context.DaysOverdue)
+                            </MudChip>
+                        </MudTd>
+                    </RowTemplate>
+                    <FooterContent>
+                        <MudTd colspan="7"><b>الإجمالي العام للديون المستحقة للموردين</b></MudTd>
+                        <MudTd Style="text-align: left;"><b style="color: #ea580c; font-size: 1.1em;">@TotalOutstanding.ToString("N2") @_currency</b></MudTd>
+                        <MudTd></MudTd>
+                    </FooterContent>
+                </MudTable>
+            </MudCardContent>
+        </MudCard>
+    }
+    else if (!_loading)
+    {
+        <MudCard Class="wh-card pa-8 text-center" Elevation="1">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="MudBlazor.Color.Success" Style="font-size: 54px;" />
+            <MudText MudBlazor.Typo="Typo.h6" Class="mt-3">لا توجد ديون أو مستحقات متأخرة على أي مورد حالياً</MudText>
+        </MudCard>
+    }
+</div>
+
+<!-- ════════════════════ PRINT PREVIEW MODAL OVERLAY ════════════════════ -->
+@if (_showPrintPreview)
+{
+    <div class="wh-print-overlay" @onclick="@(() => _showPrintPreview = false)">
+        <div class="wh-print-dialog-card" @onclick:stopPropagation="true">
+            <div class="wh-print-dialog-header no-print">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.DateRange" Color="MudBlazor.Color.Warning" />
+                    <MudText Typo="Typo.h6" Style="font-weight: 800; color: #0f172a;">معاينة وطباعة تقرير أعمار ديون الموردين</MudText>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudButton Variant="MudBlazor.Variant.Filled" Color="MudBlazor.Color.Warning"
+                               StartIcon="@Icons.Material.Filled.Print" OnClick="PrintReport" Style="font-weight: 800; border-radius: 8px;">
+                        طباعة الآن
+                    </MudButton>
+                    <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Success"
+                               StartIcon="@Icons.Material.Filled.TableChart" OnClick="ExportExcel" Style="font-weight: 700; border-radius: 8px;">
+                        تصدير إكسيل (.xlsx)
+                    </MudButton>
+                    <MudIconButton Icon="@Icons.Material.Rounded.Close" OnClick="@(() => _showPrintPreview = false)" />
+                </div>
+            </div>
+
+            <div class="wh-print-dialog-body">
+                <div class="wh-printable-sheet" dir="rtl">
+                    <!-- Clean Header (Report Title Only) -->
+                    <div style="text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 14px;">
+                        <h2 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 1.4rem;">تقرير ديون ومستحقات الموردين (Supplier Aging)</h2>
+                        <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.85rem;">
+                            تاريخ: @DateTime.Now.ToString("yyyy/MM/dd hh:mm tt")
+                        </p>
+                    </div>
+
+                    <!-- Summary Cards in Print -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                        <div style="flex: 1; padding: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; text-align: center;">
+                            <span style="font-size: 0.75rem; color: #047857; display: block; font-weight: 700;">جارية (&lt;30)</span>
+                            <strong style="font-size: 1.05rem; color: #065f46;">@Current30.ToString("0.##") @_currency</strong>
+                        </div>
+                        <div style="flex: 1; padding: 8px; background: #fefce8; border: 1px solid #fde047; border-radius: 6px; text-align: center;">
+                            <span style="font-size: 0.75rem; color: #a16207; display: block; font-weight: 700;">31-60 يوم</span>
+                            <strong style="font-size: 1.05rem; color: #854d0e;">@Overdue60.ToString("0.##") @_currency</strong>
+                        </div>
+                        <div style="flex: 1; padding: 8px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; text-align: center;">
+                            <span style="font-size: 0.75rem; color: #c2410c; display: block; font-weight: 700;">61-90 يوم</span>
+                            <strong style="font-size: 1.05rem; color: #9a3412;">@Overdue90.ToString("0.##") @_currency</strong>
+                        </div>
+                        <div style="flex: 1; padding: 8px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; text-align: center;">
+                            <span style="font-size: 0.75rem; color: #b91c1c; display: block; font-weight: 700;">حرجة (&gt;90)</span>
+                            <strong style="font-size: 1.05rem; color: #991b1b;">@Overdue90Plus.ToString("0.##") @_currency</strong>
+                        </div>
+                    </div>
+
+                    <!-- Table in Print -->
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 24px;">
+                        <thead>
+                            <tr style="background: #0f172a; color: white;">
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">#</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">المورد</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">رقم الفاتورة</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">تاريخ الفاتورة</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: right;">الاستحقاق</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: center;">التأخير</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: left;">الإجمالي (@_currency)</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: left;">المسدد (@_currency)</th>
+                                <th style="padding: 6px 8px; border: 1px solid #cbd5e1; text-align: left;">المستحق (@_currency)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ int aIdx = 1; }
+                            @foreach (var item in FilteredInvoices)
+                            {
+                                <tr style="background: @(aIdx % 2 == 0 ? "#f8fafc" : "#ffffff");">
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center;">@aIdx</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; font-weight: 700;">@item.SupplierName</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0;">@item.InvoiceNumber</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0;">@item.InvoiceDate.ToString("yyyy/MM/dd")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0;">@item.DueDate.ToString("yyyy/MM/dd")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: center; font-weight: 700;">@(item.DaysOverdue > 0 ? $"{item.DaysOverdue} يوم" : "جارية")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: left;">@item.TotalAmount.ToString("N2")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: left;">@item.PaidAmount.ToString("N2")</td>
+                                    <td style="padding: 5px 6px; border: 1px solid #e2e8f0; text-align: left; font-weight: 700; color: #ea580c;">@item.Outstanding.ToString("N2")</td>
+                                </tr>
+                                aIdx++;
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: #f1f5f9; font-weight: 800;">
+                                <td colspan="8" style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">الإجمالي العام للديون المستحقة</td>
+                                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: left; color: #ea580c; font-size: 1rem;">@TotalOutstanding.ToString("N2") @_currency</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <!-- Signatures -->
+                    <div style="display: flex; justify-content: space-around; margin-top: 24px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                        <div style="text-align: center; width: 220px;">
+                            <span style="font-weight: 700; color: #475569; display: block; margin-bottom: 24px;">المحاسب المسؤول</span>
+                            <span style="border-top: 1px solid #94a3b8; display: block; padding-top: 4px;">التوقيع: .....................</span>
+                        </div>
+                        <div style="text-align: center; width: 220px;">
+                            <span style="font-weight: 700; color: #475569; display: block; margin-bottom: 24px;">المدير المالي / الاعتماد</span>
+                            <span style="border-top: 1px solid #94a3b8; display: block; padding-top: 4px;">التوقيع: .....................</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool IsArabic => LocalizerService.GetCurrentLanguage() == "ar";
+    private bool _loading = true;
+    private string _search = "";
+    private string _currency = "ج.م";
+    private bool _showPrintPreview = false;
+
+    private List<AgingInvoiceDto> _invoices = new();
+
+    // Charts
+    private double[] _agingDonutData = Array.Empty<double>();
+    private string[] _agingDonutLabels = Array.Empty<string>();
+    private List<ChartSeries> _topSuppliersSeries = new();
+    private string[] _topSuppliersLabels = Array.Empty<string>();
+
+    private IEnumerable<AgingInvoiceDto> FilteredInvoices => _invoices.Where(i =>
+        string.IsNullOrWhiteSpace(_search) ||
+        (i.SupplierName != null && i.SupplierName.Contains(_search, StringComparison.OrdinalIgnoreCase)) ||
+        i.InvoiceNumber.Contains(_search, StringComparison.OrdinalIgnoreCase)
+    );
+
+    private decimal Current30 => _invoices.Where(i => i.DaysOverdue <= 30).Sum(i => i.Outstanding);
+    private decimal Overdue60 => _invoices.Where(i => i.DaysOverdue > 30 && i.DaysOverdue <= 60).Sum(i => i.Outstanding);
+    private decimal Overdue90 => _invoices.Where(i => i.DaysOverdue > 60 && i.DaysOverdue <= 90).Sum(i => i.Outstanding);
+    private decimal Overdue90Plus => _invoices.Where(i => i.DaysOverdue > 90).Sum(i => i.Outstanding);
+    private decimal TotalOutstanding => _invoices.Sum(i => i.Outstanding);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _currency = await CurrencyService.GetCurrencySymbolAsync(); } catch { _currency = "ج.م"; }
+        await LoadAging();
+    }
+
+    private async Task LoadAging()
+    {
+        _loading = true;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<List<AgingInvoiceDto>>("api/warehouse/reports/supplier-aging");
+            _invoices = res ?? new();
+            BuildCharts();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ أثناء تحميل تقرير أعمار الديون: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void BuildCharts()
+    {
+        if (!_invoices.Any()) return;
+
+        // 1. Aging Buckets Donut
+        _agingDonutData = new double[] { (double)Current30, (double)Overdue60, (double)Overdue90, (double)Overdue90Plus };
+        _agingDonutLabels = new string[]
+        {
+            $"جارية <30 ({Current30:0.##})",
+            $"31-60 ({Overdue60:0.##})",
+            $"61-90 ({Overdue90:0.##})",
+            $"حرجة >90 ({Overdue90Plus:0.##})"
+        };
+
+        // 2. Top Suppliers by Debt Bar Chart
+        var topSuppliers = _invoices.GroupBy(x => x.SupplierName ?? "مورد غير محدد")
+                                    .Select(g => new { Name = g.Key, Debt = (double)g.Sum(x => x.Outstanding) })
+                                    .OrderByDescending(x => x.Debt)
+                                    .Take(5)
+                                    .ToList();
+
+        _topSuppliersLabels = topSuppliers.Select(x => x.Name.Length > 12 ? x.Name.Substring(0, 12) + ".." : x.Name).ToArray();
+        _topSuppliersSeries = new List<ChartSeries>
+        {
+            new ChartSeries { Name = $"المديونية المستحقة ({_currency})", Data = topSuppliers.Select(x => x.Debt).ToArray() }
+        };
+    }
+
+    private void OpenPrintPreview()
+    {
+        if (!_invoices.Any())
+        {
+            Snackbar.Add("لا توجد فواتير للمعاينة والطباعة", MudBlazor.Severity.Warning);
+            return;
+        }
+        _showPrintPreview = true;
+    }
+
+    private async Task PrintReport()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("printReportElement", ".wh-printable-sheet");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ أثناء الطباعة: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private void ExportExcel()
+    {
+        if (!_invoices.Any())
+        {
+            Snackbar.Add("لا توجد بيانات للتصدير", MudBlazor.Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var itemsList = FilteredInvoices.Select(x => new
+            {
+                SupplierName = x.SupplierName,
+                InvoiceNumber = x.InvoiceNumber,
+                InvoiceDate = (DateTime?)x.InvoiceDate,
+                DueDate = (DateTime?)x.DueDate,
+                DaysOverdue = x.DaysOverdue,
+                TotalAmount = x.TotalAmount,
+                PaidAmount = x.PaidAmount,
+                RemainingAmount = x.Outstanding
+            }).Cast<dynamic>().ToList();
+
+            var bytes = WarehouseExcelExportHelper.GenerateSupplierAging(
+                itemsList,
+                TotalOutstanding,
+                Current30,
+                Overdue60,
+                Overdue90,
+                Overdue90Plus,
+                _currency);
+
+            var defaultFileName = $"أعمار_ديون_الموردين_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+            var savedPath = PrintingService.SaveFile(bytes, defaultFileName, "Excel Files (*.xlsx)|*.xlsx", "حفظ تقرير أعمار ديون الموردين", true);
+
+            if (!string.IsNullOrEmpty(savedPath))
+            {
+                Snackbar.Add($"تم حفظ ملف الإكسيل بنجاح على جهازك: {System.IO.Path.GetFileName(savedPath)}", MudBlazor.Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"فشل التصدير: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private Color GetAgingColor(int days) => days switch
+    {
+        <= 0 => MudBlazor.Color.Success,
+        <= 30 => MudBlazor.Color.Info,
+        <= 60 => MudBlazor.Color.Warning,
+        _ => MudBlazor.Color.Error
+    };
+
+    private string GetAgingLabel(int days) => days switch
+    {
+        <= 0 => "جارية",
+        <= 30 => "1-30 يوم",
+        <= 60 => "31-60 يوم",
+        <= 90 => "61-90 يوم",
+        _ => "أكثر من 90 يوم"
+    };
+
+    public record AgingInvoiceDto(
+        int SupplierId, string? SupplierName, string InvoiceNumber,
+        DateTime InvoiceDate, DateTime DueDate, decimal TotalAmount,
+        decimal PaidAmount, decimal Outstanding, int DaysOverdue);
+}

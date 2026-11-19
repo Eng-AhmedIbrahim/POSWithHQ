@@ -1,0 +1,52 @@
+@using HQ.Desktop.Components.Layout
+@using HQ.Desktop.Components.Pages
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using MudBlazor
+
+<MudThemeProvider Theme="@_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(HQ.Desktop.App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <LayoutView Layout="typeof(MainLayout)">
+                <RedirectToLogin />
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+@code {
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = new MudBlazor.Utilities.MudColor("#C9A227"),
+            Secondary = new MudBlazor.Utilities.MudColor("#8A6A12"),
+            Tertiary = new MudBlazor.Utilities.MudColor("#1C1408"),
+            AppbarBackground = new MudBlazor.Utilities.MudColor("#FFFFFF"),
+            Background = new MudBlazor.Utilities.MudColor("#F7F1DE"),
+            Surface = new MudBlazor.Utilities.MudColor("#FFFFFF"),
+            TextPrimary = new MudBlazor.Utilities.MudColor("#1C1408"),
+            TextSecondary = new MudBlazor.Utilities.MudColor("#6B5420")
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography
+            {
+                FontFamily = ["Tajawal", "Segoe UI", "Arial", "sans-serif"]
+            },
+            Button = new ButtonTypography { TextTransform = "none" }
+        }
+    };
+}

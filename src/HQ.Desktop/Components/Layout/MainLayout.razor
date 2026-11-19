@@ -1,0 +1,15 @@
+@inherits LayoutComponentBase
+
+<AuthorizeView>
+    <Authorized>
+        <div class="hq-shell" dir="rtl">
+            <NavMenu />
+            <main class="hq-page">
+                @Body
+            </main>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @Body
+    </NotAuthorized>
+</AuthorizeView>

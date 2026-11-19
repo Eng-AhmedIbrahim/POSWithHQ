@@ -1,0 +1,279 @@
+﻿@page "/purchasing/orders"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+@inject BlazorBase.Services.LocalizationService LocalizerService
+
+<div class="wh-page-wrapper" dir="@(IsArabic ? "rtl" : "ltr")">
+    <div class="wh-page-header">
+        <MudText MudBlazor.Typo="Typo.h5" Class="wh-title">أوامر الشراء</MudText>
+        <MudButton Variant="MudBlazor.Variant.Filled" Class="wh-btn-primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">إضافة أمر شراء جديد</MudButton>
+    </div>
+
+    <MudPaper Class="wh-card mb-3 pa-2 d-flex gap-2 flex-wrap align-center" Elevation="0" Style="border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+        <MudChip T="string" Color="@(_activeTab == 0 ? MudBlazor.Color.Warning : MudBlazor.Color.Default)"
+                 Variant="@(_activeTab == 0 ? MudBlazor.Variant.Filled : MudBlazor.Variant.Outlined)"
+                 OnClick="@(() => _activeTab = 0)" Size="MudBlazor.Size.Medium" Style="font-weight: 800; cursor: pointer;">
+            الكل (@_orders.Count)
+        </MudChip>
+        <MudChip T="string" Color="@(_activeTab == 1 ? MudBlazor.Color.Default : MudBlazor.Color.Default)"
+                 Variant="@(_activeTab == 1 ? MudBlazor.Variant.Filled : MudBlazor.Variant.Outlined)"
+                 OnClick="@(() => _activeTab = 1)" Size="MudBlazor.Size.Medium" Style="font-weight: 800; cursor: pointer;">
+            مسودة (@_orders.Count(o => o.Status == "Draft"))
+        </MudChip>
+        <MudChip T="string" Color="@(_activeTab == 2 ? MudBlazor.Color.Info : MudBlazor.Color.Default)"
+                 Variant="@(_activeTab == 2 ? MudBlazor.Variant.Filled : MudBlazor.Variant.Outlined)"
+                 OnClick="@(() => _activeTab = 2)" Size="MudBlazor.Size.Medium" Style="font-weight: 800; cursor: pointer;">
+            معتمد (@_orders.Count(o => o.Status == "Approved"))
+        </MudChip>
+        <MudChip T="string" Color="@(_activeTab == 3 ? MudBlazor.Color.Warning : MudBlazor.Color.Default)"
+                 Variant="@(_activeTab == 3 ? MudBlazor.Variant.Filled : MudBlazor.Variant.Outlined)"
+                 OnClick="@(() => _activeTab = 3)" Size="MudBlazor.Size.Medium" Style="font-weight: 800; cursor: pointer;">
+            مستلم جزئياً (@_orders.Count(o => o.Status == "PartiallyReceived"))
+        </MudChip>
+        <MudChip T="string" Color="@(_activeTab == 4 ? MudBlazor.Color.Success : MudBlazor.Color.Default)"
+                 Variant="@(_activeTab == 4 ? MudBlazor.Variant.Filled : MudBlazor.Variant.Outlined)"
+                 OnClick="@(() => _activeTab = 4)" Size="MudBlazor.Size.Medium" Style="font-weight: 800; cursor: pointer;">
+            مستلم بالكامل (@_orders.Count(o => o.Status == "FullyReceived"))
+        </MudChip>
+        <MudChip T="string" Color="@(_activeTab == 5 ? MudBlazor.Color.Error : MudBlazor.Color.Default)"
+                 Variant="@(_activeTab == 5 ? MudBlazor.Variant.Filled : MudBlazor.Variant.Outlined)"
+                 OnClick="@(() => _activeTab = 5)" Size="MudBlazor.Size.Medium" Style="font-weight: 800; cursor: pointer;">
+            ملغي (@_orders.Count(o => o.Status == "Cancelled"))
+        </MudChip>
+    </MudPaper>
+
+    <MudCard Class="wh-card">
+        <MudCardContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Color="MudBlazor.Color.Warning" Indeterminate="true" />
+            }
+            else
+            {
+                <MudTable Items="FilteredOrders" Hover="true" Striped="true" Dense="true"
+                          MudBlazor.Breakpoint="MudBlazor.Breakpoint.Sm" Class="wh-table">
+                    <HeaderContent>
+                        <MudTh>رقم الأمر</MudTh>
+                        <MudTh>المورد</MudTh>
+                        <MudTh>تاريخ الأمر</MudTh>
+                        <MudTh>تاريخ التسليم المتوقع</MudTh>
+                        <MudTh>المبلغ الإجمالي</MudTh>
+                        <MudTh>الحالة</MudTh>
+                        <MudTh>إذونات الاستلام</MudTh>
+                        <MudTh>الإجراءات</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="رقم الأمر">@context.DisplayPONumber</MudTd>
+                        <MudTd DataLabel="المورد">@context.SupplierName</MudTd>
+                        <MudTd DataLabel="تاريخ الأمر">@context.OrderDate.ToString(IsArabic ? "dd/MM/yyyy" : "MM/dd/yyyy", IsArabic ? new System.Globalization.CultureInfo("ar-SA") : new System.Globalization.CultureInfo("en-US"))</MudTd>
+                        <MudTd DataLabel="تاريخ التسليم المتوقع">@context.ExpectedDeliveryDate?.ToString(IsArabic ? "dd/MM/yyyy" : "MM/dd/yyyy", IsArabic ? new System.Globalization.CultureInfo("ar-SA") : new System.Globalization.CultureInfo("en-US"))</MudTd>
+                        <MudTd DataLabel="المبلغ الإجمالي">@context.TotalAmount.ToString("N2")</MudTd>
+                        <MudTd DataLabel="الحالة">
+                            <MudChip T="string" Size="MudBlazor.Size.Small" Color="@GetStatusColor(context.Status)" Variant="MudBlazor.Variant.Filled">
+                                @GetStatusLabel(context.Status)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="إذونات الاستلام">
+                            <MudBadge Content="@context.GRNsCount" Color="MudBlazor.Color.Warning" Overlap="true">
+                                <MudIcon Icon="@Icons.Material.Filled.Receipt" />
+                            </MudBadge>
+                        </MudTd>
+                        <MudTd DataLabel="الإجراءات">
+                            <MudButtonGroup Variant="MudBlazor.Variant.Outlined" Size="MudBlazor.Size.Small">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="MudBlazor.Color.Default"
+                                              Title="عرض" OnClick="@(() => OpenViewDialog(context))" />
+                                @if (context.Status == "Draft")
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="MudBlazor.Color.Success"
+                                                  Title="اعتماد" OnClick="@(() => ApprovePO(context))" />
+                                }
+                                @if (context.Status == "Approved")
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.MoveToInbox" Color="MudBlazor.Color.Warning"
+                                                  Title="إنشاء إذن استلام" OnClick="@(() => CreateGRN(context))" />
+                                }
+                                @if (context.Status is "Draft" or "Approved")
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="MudBlazor.Color.Error"
+                                                  Title="إلغاء" OnClick="@(() => CancelPO(context))" />
+                                }
+                                <MudIconButton Icon="@Icons.Material.Filled.History" Color="MudBlazor.Color.Info"
+                                              Title="سجل الأحداث" OnClick="@(() => ShowLogs(context))" />
+                            </MudButtonGroup>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Class="pa-4">لا توجد أوامر شراء</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            }
+        </MudCardContent>
+    </MudCard>
+</div>
+
+@code {
+    private bool _loading = false;
+    private int _activeTab = 0;
+    private List<PurchaseOrderDto> _orders = new();
+
+    private bool IsArabic => LocalizerService.GetCurrentLanguage() == "ar";
+
+    private string[] StatusFilters = { "", "Draft", "Approved", "PartiallyReceived", "FullyReceived", "Cancelled" };
+
+    private IEnumerable<PurchaseOrderDto> FilteredOrders =>
+        string.IsNullOrEmpty(StatusFilters[_activeTab])
+            ? _orders
+            : _orders.Where(o => o.Status == StatusFilters[_activeTab]);
+
+    protected override async Task OnInitializedAsync() => await LoadOrders();
+
+    private async Task LoadOrders()
+    {
+        _loading = true;
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<PurchaseOrderDto>>("api/purchaseorders");
+            _orders = result ?? new();
+        }
+        catch
+        {
+            try
+            {
+                var result = await Http.GetFromJsonAsync<List<PurchaseOrderDto>>("api/warehouse/purchase-orders");
+                _orders = result ?? new();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"خطأ في تحميل أوامر الشراء: {ex.Message}", MudBlazor.Severity.Error);
+            }
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var dialog = await DialogService.ShowAsync<PurchaseOrderDialog>("إنشاء أمر شراء جديد",
+            new DialogParameters(), new MudBlazor.DialogOptions { MaxWidth = MudBlazor.MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadOrders();
+    }
+
+    private async Task OpenViewDialog(PurchaseOrderDto po)
+    {
+        var parameters = new DialogParameters { ["OrderId"] = po.Id, ["ReadOnly"] = po.Status != "Draft" };
+        var dialog = await DialogService.ShowAsync<PurchaseOrderDialog>($"أمر الشراء - {po.PONumber}",
+            parameters, new MudBlazor.DialogOptions { MaxWidth = MudBlazor.MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadOrders();
+    }
+
+    private async Task ApprovePO(PurchaseOrderDto po)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"/api/purchaseorders/{po.Id}/approve", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("تم اعتماد أمر الشراء بنجاح", MudBlazor.Severity.Success);
+                await LoadOrders();
+            }
+            else Snackbar.Add("فشل اعتماد أمر الشراء", MudBlazor.Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", MudBlazor.Severity.Error); }
+    }
+
+    private async Task CreateGRN(PurchaseOrderDto po)
+    {
+        var parameters = new DialogParameters { ["SelectedPOId"] = po.Id };
+        var dialog = await DialogService.ShowAsync<GoodsReceiptDialog>("إنشاء إذن استلام",
+            parameters, new MudBlazor.DialogOptions { MaxWidth = MudBlazor.MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadOrders();
+    }
+
+    private async Task CancelPO(PurchaseOrderDto po)
+    {
+        // طلب سبب الإلغاء
+        bool? confirm = await DialogService.ShowMessageBox(
+            "تأكيد الإلغاء",
+            $"هل أنت متأكد من إلغاء أمر الشراء {po.DisplayPONumber}؟",
+            yesText: "نعم، إلغاء", cancelText: "لا");
+        if (confirm != true) return;
+
+        try
+        {
+            var payload = new { Reason = "تم الإلغاء من واجهة المستخدم" };
+            var resp = await Http.PostAsJsonAsync($"/api/purchaseorders/{po.Id}/cancel", payload);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("تم إلغاء أمر الشراء وتسجيله في السجل", MudBlazor.Severity.Info);
+                await LoadOrders();
+            }
+            else Snackbar.Add("فشل إلغاء أمر الشراء", MudBlazor.Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", MudBlazor.Severity.Error); }
+    }
+
+    // ── Audit Log Dialog ──────────────────────────────────────────────────────
+    private async Task ShowLogs(PurchaseOrderDto po)
+    {
+        var parameters = new DialogParameters
+        {
+            ["PoId"] = po.Id,
+            ["PoNumber"] = po.DisplayPONumber
+        };
+        var options = new MudBlazor.DialogOptions
+        {
+            MaxWidth = MudBlazor.MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+        await DialogService.ShowAsync<PurchaseOrderLogsDialog>($"سجل أحداث - {po.DisplayPONumber}", parameters, options);
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Draft"             => MudBlazor.Color.Default,
+        "Approved"          => MudBlazor.Color.Info,
+        "PartiallyReceived" => MudBlazor.Color.Warning,
+        "FullyReceived"     => MudBlazor.Color.Success,
+        "Closed"            => MudBlazor.Color.Primary,
+        "Cancelled"         => MudBlazor.Color.Error,
+        _                   => MudBlazor.Color.Default
+    };
+
+    private string GetStatusLabel(string status) => status switch
+    {
+        "Draft"             => "مسودة",
+        "Approved"          => "معتمد",
+        "PartiallyReceived" => "مستلم جزئياً",
+        "FullyReceived"     => "مستلم بالكامل",
+        "Closed"            => "مغلق",
+        "Cancelled"         => "ملغي",
+        _                   => status
+    };
+
+    // DTOs
+    private class PurchaseOrderDto
+    {
+        public int Id { get; set; }
+        public string? PONumber { get; set; }
+        public string? OrderNumber { get; set; }
+        public string? SupplierName { get; set; }
+        public DateTime OrderDate { get; set; }
+        public DateTime? ExpectedDeliveryDate { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string? Status { get; set; }
+        public int GRNsCount { get; set; }
+
+        public string DisplayPONumber => !string.IsNullOrEmpty(PONumber) ? PONumber : (OrderNumber ?? $"PO-{Id}");
+        public string DisplayStatus => Status ?? "Draft";
+    }
+}
+

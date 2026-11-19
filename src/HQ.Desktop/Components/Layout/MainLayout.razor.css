@@ -1,0 +1,12 @@
+.hq-shell {
+    height: 100vh;
+    display: flex;
+    flex-direction: row;
+    background: #f7f1de;
+}
+
+.hq-page {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+}

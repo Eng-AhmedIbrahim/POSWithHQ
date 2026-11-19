@@ -1,0 +1,269 @@
+﻿@page "/products"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using Warehouse.Desktop.Components.Pages.WH_Products
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavManager
+
+<div class="wh-page-wrapper" dir="@(IsArabic ? "rtl" : "ltr")">
+    <div class="wh-page-header">
+        <MudText MudBlazor.Typo="Typo.h5" Class="wh-header-title">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Class="me-2" />
+            إدارة المنتجات
+        </MudText>
+        <MudSpacer />
+        <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Warning" StartIcon="@Icons.Material.Filled.Category"
+                   OnClick="OpenManageCategoriesDialog" Class="me-2" Style="border-radius: 8px; font-weight: 700; height: 38px;">
+            إدارة الفئات
+        </MudButton>
+        <MudButton Variant="MudBlazor.Variant.Outlined" Color="MudBlazor.Color.Info" StartIcon="@Icons.Material.Filled.Straighten"
+                   OnClick="OpenManageUnitsDialog" Class="me-2" Style="border-radius: 8px; font-weight: 700; height: 38px;">
+            إدارة الوحدات
+        </MudButton>
+        <MudButton Variant="MudBlazor.Variant.Filled" Class="wh-btn-primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">إضافة منتج</MudButton>
+    </div>
+
+    <MudCard Class="wh-card mb-4" Elevation="1">
+        <MudCardContent>
+            <MudGrid Spacing="3" Class="align-end">
+                <MudItem xs="12" sm="6" md="5">
+                    <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block" Style="color: #475569;">
+                        <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="MudBlazor.Size.Small" Class="me-1" Style="vertical-align: sub;" />
+                        بحث (اسم / كود / باركود)
+                    </MudText>
+                    <MudTextField @bind-Value="SearchText" Placeholder="ابحث بالاسم، الكود، أو امسح الباركود..."
+                                  MudBlazor.Adornment="MudBlazor.Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  AdornmentColor="MudBlazor.Color.Warning"
+                                  Immediate="true" OnKeyUp="ApplyFilter" Variant="MudBlazor.Variant.Outlined"
+                                  Margin="MudBlazor.Margin.Dense" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudText Typo="MudBlazor.Typo.caption" Class="fw-bold mb-1 d-block" Style="color: #475569;">
+                        <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Size="MudBlazor.Size.Small" Class="me-1" Style="vertical-align: sub;" />
+                        الحالة
+                    </MudText>
+                    <MudSelect T="bool?" @bind-Value="ActiveFilter" Variant="MudBlazor.Variant.Outlined"
+                               Margin="MudBlazor.Margin.Dense" AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem T="bool?" Value="null">جميع الحالات</MudSelectItem>
+                        <MudSelectItem T="bool?" Value="true">نشط فقط</MudSelectItem>
+                        <MudSelectItem T="bool?" Value="false">غير نشط فقط</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="4" Class="d-flex align-end gap-2 pb-1">
+                    <MudButton Variant="MudBlazor.Variant.Filled" Color="MudBlazor.Color.Warning" OnClick="LoadProducts"
+                               StartIcon="@Icons.Material.Filled.Refresh" Style="height: 40px; border-radius: 8px; font-weight: 700;">تحديث</MudButton>
+                    <MudChip T="string" Color="MudBlazor.Color.Default" Variant="MudBlazor.Variant.Outlined" Style="height: 40px;">
+                        إجمالي المنتجات: @FilteredProducts.Count
+                    </MudChip>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @if (IsLoading)
+    {
+        <MudProgressLinear Color="MudBlazor.Color.Warning" Indeterminate="true" Class="mb-2" />
+    }
+
+    <MudCard Class="wh-card">
+        <MudCardContent>
+            <MudTable Items="FilteredProducts" Dense="true" Hover="true" Striped="true"
+                      Loading="IsLoading" LoadingProgressColor="MudBlazor.Color.Warning"
+                      RowClassFunc="RowClass">
+                <HeaderContent>
+                    <MudTh>كود المنتج</MudTh>
+                    <MudTh>اسم المنتج</MudTh>
+                    <MudTh>الفئة</MudTh>
+                    <MudTh>وحدة الأساس</MudTh>
+                    <MudTh>المخزون الحالي</MudTh>
+                    <MudTh>حد إعادة الطلب</MudTh>
+                    <MudTh>سعر التكلفة</MudTh>
+                    <MudTh>الحالة</MudTh>
+                    <MudTh>الإجراءات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="كود المنتج">
+                        <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Default" Variant="MudBlazor.Variant.Outlined" Style="font-weight: 700;">@context.DisplayCode</MudChip>
+                        @if (!string.IsNullOrEmpty(context.Barcode) && context.Barcode != context.DisplayCode)
+                        {
+                            <div class="mud-text-secondary mt-1" style="font-size:0.75rem; font-family: monospace;">
+                                <MudIcon Icon="@Icons.Material.Filled.QrCode" Size="MudBlazor.Size.Small" Style="font-size: 0.85rem; vertical-align: middle;" />
+                                @context.Barcode
+                            </div>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="اسم المنتج">
+                        <div class="font-weight-bold" style="font-size: 0.95rem;">@context.DisplayName</div>
+                        @if (!string.IsNullOrEmpty(context.NameEn))
+                        {
+                            <div class="mud-text-secondary" style="font-size:0.78rem;">@context.NameEn</div>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="الفئة">
+                        <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Primary" Variant="MudBlazor.Variant.Text">
+                            @(context.CategoryName ?? "-")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="وحدة الأساس">
+                        <MudChip T="string" Size="MudBlazor.Size.Small" Color="MudBlazor.Color.Warning" Variant="MudBlazor.Variant.Outlined">
+                            @(string.IsNullOrEmpty(context.BaseUnitName) ? "-" : $"وحدة الأساس: {context.BaseUnitName}")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="المخزون الحالي">
+                        <MudText Color="@(context.CurrentStock <= context.DisplayReorderLevel ? MudBlazor.Color.Error : MudBlazor.Color.Success)"
+                                 Class="font-weight-bold">
+                            @context.CurrentStock
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="حد إعادة الطلب">@context.DisplayReorderLevel</MudTd>
+                    <MudTd DataLabel="سعر التكلفة">@context.DisplayCost.ToString("N2")</MudTd>
+                    <MudTd DataLabel="الحالة">
+                        <MudChip T="string" Size="MudBlazor.Size.Small" Color="@(context.IsActive ? MudBlazor.Color.Success : MudBlazor.Color.Error)">
+                            @(context.IsActive ? "نشط" : "غير نشط")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="الإجراءات">
+                        <MudButtonGroup Size="MudBlazor.Size.Small" Variant="MudBlazor.Variant.Outlined">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="MudBlazor.Color.Warning"
+                                           OnClick="() => OpenEditDialog(context)" Title="تعديل" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="MudBlazor.Color.Error"
+                                           OnClick="() => DeleteProduct(context)" Title="حذف" />
+                        </MudButtonGroup>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText MudBlazor.Align="MudBlazor.Align.Center" Class="pa-4 mud-text-secondary">لا توجد منتجات مطابقة</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        </MudCardContent>
+    </MudCard>
+</div>
+
+@code {
+    private class ProductDto
+    {
+        public int Id { get; set; }
+        public string? SKU { get; set; }
+        public string? ProductCode { get; set; }
+        public string? Barcode { get; set; }
+        public string? NameAr { get; set; }
+        public string? Name { get; set; }
+        public string? NameEn { get; set; }
+        public string? CategoryName { get; set; }
+        public string? BaseUnitName { get; set; }
+        public decimal CurrentStock { get; set; }
+        public decimal ReorderPoint { get; set; }
+        public decimal ReorderLevel { get; set; }
+        public decimal WeightedAverageCost { get; set; }
+        public decimal CostPrice { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public string DisplayCode => !string.IsNullOrWhiteSpace(SKU) ? SKU : (!string.IsNullOrWhiteSpace(ProductCode) ? ProductCode : (!string.IsNullOrWhiteSpace(Barcode) ? Barcode : $"PRD-{Id:D4}"));
+        public string DisplayName => !string.IsNullOrWhiteSpace(NameAr) ? NameAr : (!string.IsNullOrWhiteSpace(Name) ? Name : (NameEn ?? $"منتج {Id}"));
+        public decimal DisplayCost => WeightedAverageCost > 0 ? WeightedAverageCost : CostPrice;
+        public decimal DisplayReorderLevel => ReorderPoint > 0 ? ReorderPoint : ReorderLevel;
+    }
+
+    private List<ProductDto> AllProducts = new();
+    private List<ProductDto> FilteredProducts = new();
+    private string SearchText = string.Empty;
+    private bool? ActiveFilter = null;
+    private bool IsLoading = false;
+    private bool IsArabic => true;
+
+    protected override async Task OnInitializedAsync() => await LoadProducts();
+
+    private async Task LoadProducts()
+    {
+        IsLoading = true;
+        StateHasChanged();
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<ProductDto>>("api/warehouseproducts");
+            AllProducts = result ?? new();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"خطأ في تحميل المنتجات: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally { IsLoading = false; StateHasChanged(); }
+    }
+
+    private void ApplyFilter()
+    {
+        var text = SearchText?.Trim() ?? "";
+        FilteredProducts = AllProducts.Where(p =>
+            p != null &&
+            (string.IsNullOrWhiteSpace(text) ||
+             (!string.IsNullOrEmpty(p.DisplayName) && p.DisplayName.Contains(text, StringComparison.OrdinalIgnoreCase)) ||
+             (!string.IsNullOrEmpty(p.DisplayCode) && p.DisplayCode.Contains(text, StringComparison.OrdinalIgnoreCase)) ||
+             (!string.IsNullOrEmpty(p.Barcode) && p.Barcode.Contains(text, StringComparison.OrdinalIgnoreCase)) ||
+             (!string.IsNullOrEmpty(p.SKU) && p.SKU.Contains(text, StringComparison.OrdinalIgnoreCase)) ||
+             (!string.IsNullOrEmpty(p.NameEn) && p.NameEn.Contains(text, StringComparison.OrdinalIgnoreCase)) ||
+             (!string.IsNullOrEmpty(p.CategoryName) && p.CategoryName.Contains(text, StringComparison.OrdinalIgnoreCase))) &&
+            (ActiveFilter == null || p.IsActive == ActiveFilter)
+        ).ToList();
+        StateHasChanged();
+    }
+
+    private string RowClass(ProductDto? row, int _)
+        => (row != null && row.CurrentStock <= row.DisplayReorderLevel) ? "low-stock-row" : string.Empty;
+
+    private async Task OpenManageCategoriesDialog()
+    {
+        var options = new MudBlazor.DialogOptions { MaxWidth = MudBlazor.MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        var dlg = DialogService.Show<ManageCategoriesDialog>("إدارة فئات وتصنيفات الأصناف المخزنية", options);
+        var result = await dlg.Result;
+        if (!result.Canceled) await LoadProducts();
+    }
+
+    private async Task OpenManageUnitsDialog()
+    {
+        var options = new MudBlazor.DialogOptions { MaxWidth = MudBlazor.MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        var dlg = DialogService.Show<ManageUnitsDialog>("إدارة وحدات القياس المخزنية", options);
+        var result = await dlg.Result;
+        if (!result.Canceled) await LoadProducts();
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var options = new MudBlazor.DialogOptions { MaxWidth = MudBlazor.MaxWidth.Large, FullWidth = true, CloseButton = true };
+        var dlg = DialogService.Show<ProductDialog>("إضافة منتج جديد", options);
+        var result = await dlg.Result;
+        if (!result.Canceled) await LoadProducts();
+    }
+
+    private async Task OpenEditDialog(ProductDto product)
+    {
+        var parameters = new DialogParameters { ["ProductId"] = product.Id };
+        var options = new MudBlazor.DialogOptions { MaxWidth = MudBlazor.MaxWidth.Large, FullWidth = true, CloseButton = true };
+        var dlg = DialogService.Show<ProductDialog>("تعديل المنتج", parameters, options);
+        var result = await dlg.Result;
+        if (!result.Canceled) await LoadProducts();
+    }
+
+    private async Task DeleteProduct(ProductDto product)
+    {
+        bool confirmed = await DialogService.ShowMessageBox(
+            "تأكيد الحذف", $"هل تريد حذف المنتج '{product.DisplayName}'؟",
+            yesText: "حذف", cancelText: "إلغاء") ?? false;
+        if (!confirmed) return;
+        try
+        {
+            var response = await Http.DeleteAsync($"/api/warehouseproducts/{product.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("تم حذف المنتج بنجاح", MudBlazor.Severity.Success);
+                await LoadProducts();
+            }
+            else Snackbar.Add("فشل في حذف المنتج", MudBlazor.Severity.Error);
+        }
+        catch (Exception ex) { Snackbar.Add($"خطأ: {ex.Message}", MudBlazor.Severity.Error); }
+    }
+}
+

@@ -1,0 +1,221 @@
+@page "/"
+@attribute [Authorize]
+@inject HqAnalyticsService Analytics
+
+<div class="hq-dash" dir="rtl">
+    <header class="dash-head">
+        <div>
+            <div class="title-row">
+                <h1>لوحة مقارنات المقر</h1>
+                <span class="live-pill">تحليل تشغيلي</span>
+            </div>
+            <p>@_snapshot.ScopeHint</p>
+        </div>
+        <div class="head-actions">
+            <div class="pills">
+                @foreach (var period in _periods)
+                {
+                    <button class="pill @(_period == period.Key ? "on" : "")" @onclick="() => SetPeriod(period.Key)">@period.Value</button>
+                }
+            </div>
+            @if (_period == "Range")
+            {
+                <div class="range">
+                    <MudDatePicker Date="_from" DateChanged="OnFrom" DateFormat="yyyy-MM-dd" Label="من" />
+                    <MudDatePicker Date="_to" DateChanged="OnTo" DateFormat="yyyy-MM-dd" Label="إلى" />
+                </div>
+            }
+        </div>
+    </header>
+
+    <section class="scope-bar">
+        <div>
+            <strong>@_snapshot.ScopeTitle</strong>
+            <span>@_snapshot.CompanyCount شركات · @_snapshot.BranchCount فرع في النطاق</span>
+        </div>
+        <div class="chips">
+            @if (Analytics.Companies.Count > 1)
+            {
+                <button class="chip @(string.IsNullOrEmpty(_companyId) ? "on" : "")" @onclick="() => SelectCompany(null)">كل الشركات</button>
+            }
+            @foreach (var company in Analytics.Companies)
+            {
+                <button class="chip @(_companyId == company.Id ? "on" : "")" @onclick="() => SelectCompany(company.Id)">
+                    @company.Name
+                    <small>@company.Branches.Count فروع</small>
+                </button>
+            }
+        </div>
+    </section>
+
+    <section class="kpi-grid">
+        <article class="kpi"><span>إجمالي المبيعات</span><strong>@Money(_snapshot.Revenue)</strong><em class="@Tone(_snapshot.Growth)">@Pct(_snapshot.Growth) عن السابق</em></article>
+        <article class="kpi"><span>صافي الربح</span><strong>@Money(_snapshot.Profit)</strong><em>هامش @Pct(_snapshot.Margin)</em></article>
+        <article class="kpi"><span>الطلبات</span><strong>@_snapshot.Orders.ToString("N0")</strong><em>@_snapshot.Guests.ToString("N0") ضيف</em></article>
+        <article class="kpi"><span>متوسط الفاتورة</span><strong>@Money(_snapshot.AverageTicket)</strong><em>لكل طلب</em></article>
+        <article class="kpi"><span>الخصومات</span><strong>@Money(_snapshot.Discounts)</strong><em>@Share(_snapshot.Discounts) من المبيعات</em></article>
+        <article class="kpi"><span>الملغيات</span><strong>@Money(_snapshot.Voids)</strong><em>@Share(_snapshot.Voids) من المبيعات</em></article>
+        <article class="kpi"><span>الصالة</span><strong>@Money(_snapshot.DineIn)</strong><em>@Share(_snapshot.DineIn)</em></article>
+        <article class="kpi"><span>الدليفري + التيك أواي</span><strong>@Money(_snapshot.Delivery + _snapshot.Takeaway)</strong><em>دليفري @Share(_snapshot.Delivery)</em></article>
+    </section>
+
+    <section class="chart-grid">
+        <div class="panel wide">
+            <h3>مقارنة المبيعات</h3>
+            <MudChart ChartType="ChartType.Bar" ChartSeries="_revenueSeries" XAxisLabels="_names" ChartOptions="_palette" Width="100%" Height="280px" />
+        </div>
+        <div class="panel wide">
+            <h3>اتجاه 14 يوم</h3>
+            <MudChart ChartType="ChartType.Line" ChartSeries="_trendSeries" XAxisLabels="_trendLabels" ChartOptions="_palette" Width="100%" Height="280px" />
+        </div>
+        <div class="panel">
+            <h3>قنوات البيع</h3>
+            <MudChart ChartType="ChartType.Donut" InputData="_channels" InputLabels="_channelLabels" ChartOptions="_channelPalette" Width="100%" Height="260px" />
+        </div>
+        <div class="panel">
+            <h3>طرق التحصيل</h3>
+            <MudChart ChartType="ChartType.Donut" InputData="_payments" InputLabels="_paymentLabels" ChartOptions="_paymentPalette" Width="100%" Height="260px" />
+        </div>
+        <div class="panel">
+            <h3>هامش الربح</h3>
+            <MudChart ChartType="ChartType.Bar" ChartSeries="_marginSeries" XAxisLabels="_names" ChartOptions="_palette" Width="100%" Height="260px" />
+        </div>
+        <div class="panel wide">
+            <h3>توزيع الساعات</h3>
+            <MudChart ChartType="ChartType.Bar" ChartSeries="_hourSeries" XAxisLabels="_hourLabels" ChartOptions="_palette" Width="100%" Height="280px" />
+        </div>
+    </section>
+
+    <section class="bottom-grid">
+        <div class="panel">
+            <h3>قراءات سريعة</h3>
+            <ul>
+                @foreach (var insight in _snapshot.Insights)
+                {
+                    <li>@insight</li>
+                }
+            </ul>
+        </div>
+        <div class="panel table-panel">
+            <h3>جدول المقارنة</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>الوحدة</th>
+                            <th>المبيعات</th>
+                            <th>النمو</th>
+                            <th>الطلبات</th>
+                            <th>متوسط الفاتورة</th>
+                            <th>الخصم</th>
+                            <th>الملغي</th>
+                            <th>الربح</th>
+                            <th>الهامش</th>
+                            <th>الحصة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _snapshot.Entities)
+                        {
+                            <tr>
+                                <td>
+                                    <b>@row.Name</b>
+                                    <small>@row.Subtitle</small>
+                                </td>
+                                <td>@Money(row.Revenue)</td>
+                                <td class="@Tone(row.Growth)">@Pct(row.Growth)</td>
+                                <td>@row.Orders.ToString("N0")</td>
+                                <td>@Money(row.AverageTicket)</td>
+                                <td>@Money(row.Discounts)</td>
+                                <td>@Money(row.Voids)</td>
+                                <td>@Money(row.Profit)</td>
+                                <td>@Pct(row.Margin)</td>
+                                <td>@Share(row.Revenue)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private static readonly Dictionary<string, string> _periods = new()
+    {
+        ["Today"] = "اليوم",
+        ["Yesterday"] = "أمس",
+        ["ThisMonth"] = "هذا الشهر",
+        ["Range"] = "مدة"
+    };
+
+    private readonly string[] _channelLabels = ["صالة", "دليفري", "تيك أواي"];
+    private readonly string[] _paymentLabels = ["كاش", "بطاقة", "محفظة"];
+    private readonly ChartOptions _palette = new()
+    {
+        ChartPalette = ["#C9A227", "#8A6A12", "#1C1408", "#E8C872", "#B45309", "#6B5420"]
+    };
+    private readonly ChartOptions _channelPalette = new() { ChartPalette = ["#C9A227", "#1C1408", "#E8C872"] };
+    private readonly ChartOptions _paymentPalette = new() { ChartPalette = ["#8A6A12", "#C9A227", "#B45309"] };
+
+    private string? _companyId;
+    private string _period = "Today";
+    private DateTime? _from = DateTime.Today.AddDays(-6);
+    private DateTime? _to = DateTime.Today;
+    private HqDashboardSnapshot _snapshot = null!;
+    private List<ChartSeries> _revenueSeries = [];
+    private List<ChartSeries> _trendSeries = [];
+    private List<ChartSeries> _marginSeries = [];
+    private List<ChartSeries> _hourSeries = [];
+    private string[] _names = [];
+    private string[] _trendLabels = [];
+    private string[] _hourLabels = [];
+    private double[] _channels = [];
+    private double[] _payments = [];
+
+    protected override void OnInitialized() => Reload();
+
+    private void SetPeriod(string period)
+    {
+        _period = period;
+        Reload();
+    }
+
+    private void SelectCompany(string? id)
+    {
+        _companyId = id;
+        Reload();
+    }
+
+    private void OnFrom(DateTime? value)
+    {
+        _from = value;
+        Reload();
+    }
+
+    private void OnTo(DateTime? value)
+    {
+        _to = value;
+        Reload();
+    }
+
+    private void Reload()
+    {
+        _snapshot = Analytics.Build(_companyId, _period, _from, _to);
+        var entities = _snapshot.Entities;
+        _names = entities.Select(e => e.Name).ToArray();
+        _trendLabels = _snapshot.TrendLabels.ToArray();
+        _hourLabels = _snapshot.HourLabels.ToArray();
+        _revenueSeries = [new ChartSeries { Name = "المبيعات", Data = entities.Select(e => (double)e.Revenue).ToArray() }];
+        _marginSeries = [new ChartSeries { Name = "الهامش %", Data = entities.Select(e => Math.Round((double)e.Margin * 100, 1)).ToArray() }];
+        _trendSeries = entities.Select(e => new ChartSeries { Name = e.Name, Data = e.Trend }).ToList();
+        _hourSeries = entities.Select(e => new ChartSeries { Name = e.Name, Data = e.Hourly }).ToList();
+        _channels = [(double)_snapshot.DineIn, (double)_snapshot.Delivery, (double)_snapshot.Takeaway];
+        _payments = [(double)_snapshot.Cash, (double)_snapshot.Card, (double)_snapshot.Wallet];
+    }
+
+    private static string Money(decimal value) => $"{value:N0} ج.م";
+    private static string Pct(decimal value) => value.ToString("P1");
+    private string Share(decimal value) => _snapshot.Revenue == 0 ? "0%" : (value / _snapshot.Revenue).ToString("P1");
+    private static string Tone(decimal value) => value >= 0 ? "up" : "down";
+}
