@@ -1,0 +1,534 @@
+@page "/branches-settings"
+@attribute [Authorize]
+@inject HqDataSyncService SyncService
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<div class="branches-page" dir="rtl">
+    <!-- Header with Luxury Gold Accent -->
+    <header class="page-head">
+        <div class="head-info">
+            <div class="title-with-badge">
+                <div class="icon-circle">
+                    <MudIcon Icon="@Icons.Material.Rounded.Storefront" Size="Size.Large" Class="gold-icon" />
+                </div>
+                <div>
+                    <h1>إعدادات فروع المقر الرئيسي</h1>
+                    <p class="subtitle">تكوين روابط سيرفرات الفروع، فحص الاتصال، وإدارة لوجيك سحب البيانات والمبيعات</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="head-stats">
+            <div class="stat-pill">
+                <span>إجمالي الفروع</span>
+                <strong>@_branches.Count</strong>
+            </div>
+            <div class="stat-pill success">
+                <span>فروع متصلة</span>
+                <strong>@_branches.Count(b => b.Status == HqSyncStatus.Online)</strong>
+            </div>
+            <div class="stat-pill warning">
+                <span>فروع بحاجة لمزامنة</span>
+                <strong>@_branches.Count(b => b.Status != HqSyncStatus.Online)</strong>
+            </div>
+        </div>
+    </header>
+
+    <!-- Control & Action Toolbar -->
+    <div class="action-bar">
+        <div class="search-filter-box">
+            <div class="input-search-wrapper">
+                <MudIcon Icon="@Icons.Material.Rounded.Search" Class="search-icon" />
+                <input type="text" class="custom-search-input" placeholder="ابحث باسم الفرع أو الكود أو المدينة..."
+                       @bind="_searchTerm" @bind:event="oninput" />
+            </div>
+
+            <select class="custom-status-select" @bind="_selectedStatusFilter">
+                <option value="all">كل الحالات</option>
+                <option value="online">متصل فقط</option>
+                <option value="offline">غير متصل</option>
+                <option value="active">نشط فقط</option>
+            </select>
+        </div>
+
+        <div class="top-action-buttons">
+            <button class="gold-action-btn primary" @onclick="OpenAddModal">
+                <MudIcon Icon="@Icons.Material.Rounded.AddBusiness" Size="Size.Small" />
+                <span>إضافة فرع جديد</span>
+            </button>
+            <button class="gold-action-btn secondary" @onclick="TestAllConnections" disabled="@_isCheckingAll">
+                @if (_isCheckingAll)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="spinner-gold" />
+                    <span>جاري الفحص...</span>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.WifiFind" Size="Size.Small" />
+                    <span>فحص اتصال كل الفروع</span>
+                }
+            </button>
+            <button class="gold-action-btn sync-btn" @onclick="SyncAllBranches" disabled="@SyncService.IsGlobalSyncing">
+                @if (SyncService.IsGlobalSyncing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="spinner-gold" />
+                    <span>جاري سحب الداتا...</span>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.Sync" Size="Size.Small" />
+                    <span>سحب داتا كل الفروع</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <!-- Branch Cards Grid -->
+    <div class="branches-grid">
+        @if (FilteredBranches.Count == 0)
+        {
+            <div class="empty-state">
+                <MudIcon Icon="@Icons.Material.Rounded.LocationOff" Size="Size.Large" Class="empty-icon" />
+                <h3>لا توجد فروع مطابقة للبحث</h3>
+                <p>يمكنك تغيير معايير البحث أو إضافة فرع جديد للربط مع المقر</p>
+                <button class="gold-action-btn primary mt-2" @onclick="OpenAddModal">إضافة أول فرع</button>
+            </div>
+        }
+        else
+        {
+            @foreach (var branch in FilteredBranches)
+            {
+                <div class="branch-card @(branch.IsActive ? "" : "disabled-card")">
+                    <div class="card-top-header">
+                        <div class="code-and-title">
+                            <span class="branch-code-badge">@branch.Code</span>
+                            <div>
+                                <h3 class="branch-name">@branch.Name</h3>
+                                <span class="branch-city">@branch.City @(string.IsNullOrWhiteSpace(branch.Address) ? "" : $"· {branch.Address}")</span>
+                            </div>
+                        </div>
+                        <div class="status-indicator-badge @GetStatusClass(branch.Status)">
+                            <span class="status-dot"></span>
+                            <span>@GetStatusLabel(branch.Status)</span>
+                            @if (branch.PingLatencyMs.HasValue && branch.Status == HqSyncStatus.Online)
+                            {
+                                <small>(@branch.PingLatencyMs ms)</small>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">رابط السيرفر (API URL):</span>
+                            <span class="detail-val api-url" title="@branch.ApiUrl">@branch.ApiUrl</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">المخزن الرئيسي المورد:</span>
+                            <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.LinkedWarehouseName) ? "غير محدد" : branch.LinkedWarehouseName)</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">مدير الفرع:</span>
+                            <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.ManagerName) ? "-" : branch.ManagerName)</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">مبيعات اليوم المسحوبة:</span>
+                            <span class="detail-val revenue-highlight">@branch.TodayRevenue.ToString("N0") ج.م (@branch.TodayOrdersCount طلب)</span>
+                        </div>
+                    </div>
+
+                    <div class="last-sync-bar">
+                        <MudIcon Icon="@Icons.Material.Rounded.History" Size="Size.Small" Class="sync-time-icon" />
+                        <span>آخر سحب بيانات: @(branch.LastSyncAt.HasValue ? branch.LastSyncAt.Value.ToString("yyyy-MM-dd hh:mm tt") : "لم يتم السحب بعد")</span>
+                    </div>
+
+                    <div class="card-footer-actions">
+                        <button class="footer-btn ping-btn" title="فحص اتصال الفرع" @onclick="() => TestSingleConnection(branch)">
+                            <MudIcon Icon="@Icons.Material.Rounded.NetworkPing" Size="Size.Small" />
+                            <span>فحص الاتصال</span>
+                        </button>
+                        <button class="footer-btn pull-btn" title="سحب مبيعات الفرع الآن" @onclick="() => PullSingleBranch(branch)">
+                            <MudIcon Icon="@Icons.Material.Rounded.DownloadForOffline" Size="Size.Small" />
+                            <span>سحب الداتا</span>
+                        </button>
+                        <button class="footer-btn edit-btn" title="تعديل بيانات الفرع" @onclick="() => OpenEditModal(branch)">
+                            <MudIcon Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" />
+                            <span>تعديل</span>
+                        </button>
+                        <button class="footer-btn delete-btn" title="حذف الفرع" @onclick="() => DeleteBranch(branch)">
+                            <MudIcon Icon="@Icons.Material.Rounded.DeleteOutline" Size="Size.Small" />
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Add / Edit Modal Dialog -->
+@if (_showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-dialog-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <div class="title-with-icon">
+                    <MudIcon Icon="@(_isEditing ? Icons.Material.Rounded.EditCalendar : Icons.Material.Rounded.AddBusiness)" Class="modal-gold-icon" />
+                    <h2>@(_isEditing ? "تعديل بيانات الفرع والربط" : "إضافة فرع جديد للربط مع المقر")</h2>
+                </div>
+                <button class="close-modal-btn" @onclick="CloseModal">
+                    <MudIcon Icon="@Icons.Material.Rounded.Close" />
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <div class="form-row two-cols">
+                    <div class="form-field">
+                        <label>كود الفرع (Code) *</label>
+                        <input type="text" class="modal-input" placeholder="مثال: BR-06" @bind="_editModel.Code" />
+                    </div>
+                    <div class="form-field">
+                        <label>اسم الفرع بالعربي *</label>
+                        <input type="text" class="modal-input" placeholder="مثال: فرع الشيخ زايد" @bind="_editModel.Name" />
+                    </div>
+                </div>
+
+                <div class="form-row two-cols">
+                    <div class="form-field">
+                        <label>اسم الفرع بالإنجليزي</label>
+                        <input type="text" class="modal-input" placeholder="Zayed Branch" @bind="_editModel.NameEn" />
+                    </div>
+                    <div class="form-field">
+                        <label>المدينة / المنطقة *</label>
+                        <input type="text" class="modal-input" placeholder="الجيزة - الشيخ زايد" @bind="_editModel.City" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>عنوان الفرع بالتفصيل</label>
+                        <input type="text" class="modal-input" placeholder="شارع البستان، مول أركان" @bind="_editModel.Address" />
+                    </div>
+                </div>
+
+                <div class="form-row two-cols">
+                    <div class="form-field">
+                        <label>اسم مدير الفرع</label>
+                        <input type="text" class="modal-input" placeholder="أ / شريف سامي" @bind="_editModel.ManagerName" />
+                    </div>
+                    <div class="form-field">
+                        <label>رقم هاتف الفرع</label>
+                        <input type="text" class="modal-input" placeholder="010XXXXXXXX" @bind="_editModel.Phone" />
+                    </div>
+                </div>
+
+                <!-- API Connection Section -->
+                <div class="modal-section-box">
+                    <div class="section-title">
+                        <MudIcon Icon="@Icons.Material.Rounded.Dns" Size="Size.Small" Class="gold-icon" />
+                        <span>بيانات السيرفر لسحب الداتا (Data Pulling Endpoint)</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label>رابط API الفرع (Branch Server URL) *</label>
+                            <div class="input-with-button">
+                                <input type="text" class="modal-input" placeholder="http://192.168.1.100:5050" @bind="_editModel.ApiUrl" />
+                                <button type="button" class="test-conn-btn" @onclick="TestModalConnection" disabled="@_isTestingModal">
+                                    @if (_isTestingModal)
+                                    {
+                                        <span>جاري الفحص...</span>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Rounded.FlashOn" Size="Size.Small" />
+                                        <span>فحص الاتصال</span>
+                                    }
+                                </button>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_modalTestResult))
+                            {
+                                <div class="test-result-msg @(_modalTestSuccess ? "success" : "error")">
+                                    <MudIcon Icon="@(_modalTestSuccess ? Icons.Material.Rounded.CheckCircle : Icons.Material.Rounded.ErrorOutline)" Size="Size.Small" />
+                                    <span>@_modalTestResult</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="form-row two-cols">
+                        <div class="form-field">
+                            <label>المخزن الرئيسي المورد الافتراضي</label>
+                            <select class="modal-select" @bind="_editModel.LinkedWarehouseName">
+                                <option value="">-- اختَر المخزن الرئيسي --</option>
+                                @foreach (var wh in SyncService.MainWarehouses)
+                                {
+                                    <option value="@wh.Name">@wh.Name (@wh.City)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="form-field">
+                            <label>مفتاح التوثيق / Token (اختياري)</label>
+                            <input type="password" class="modal-input" placeholder="Bearer Token / Secret" @bind="_editModel.ApiKey" />
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="modal-checkbox-label">
+                            <input type="checkbox" @bind="_editModel.IsActive" />
+                            <span>تفعيل الفرع للمزامنة وسحب البيانات التلقائي</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="modal-btn cancel" @onclick="CloseModal">إلغاء</button>
+                <button class="modal-btn save" @onclick="SaveBranch">
+                    <MudIcon Icon="@Icons.Material.Rounded.Save" Size="Size.Small" />
+                    <span>حفظ البيانات</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<HqNodeConfig> _branches = new();
+    private string _searchTerm = "";
+    private string _selectedStatusFilter = "all";
+    private bool _isCheckingAll = false;
+    private bool _showModal = false;
+    private bool _isEditing = false;
+    private HqNodeConfig _editModel = new();
+    private bool _isTestingModal = false;
+    private string _modalTestResult = "";
+    private bool _modalTestSuccess = false;
+
+    private List<HqNodeConfig> FilteredBranches
+    {
+        get
+        {
+            var query = _branches.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim();
+                query = query.Where(b => 
+                    b.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    b.Code.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    b.City.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(b.ManagerName) && b.ManagerName.Contains(term, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            query = _selectedStatusFilter switch
+            {
+                "online" => query.Where(b => b.Status == HqSyncStatus.Online),
+                "offline" => query.Where(b => b.Status != HqSyncStatus.Online),
+                "active" => query.Where(b => b.IsActive),
+                _ => query
+            };
+
+            return query.OrderBy(b => b.Code).ToList();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        SyncService.OnSyncStateChanged += HandleSyncChanged;
+        RefreshList();
+    }
+
+    private void HandleSyncChanged()
+    {
+        InvokeAsync(() =>
+        {
+            RefreshList();
+            StateHasChanged();
+        });
+    }
+
+    private void RefreshList()
+    {
+        _branches = SyncService.Branches.ToList();
+    }
+
+    private void OpenAddModal()
+    {
+        var count = _branches.Count + 1;
+        _editModel = new HqNodeConfig
+        {
+            NodeType = HqNodeType.Branch,
+            Code = $"BR-{(count < 10 ? "0" : "")}{count}",
+            City = "القاهرة",
+            ApiUrl = "http://100.79.100.86:5050",
+            IsActive = true,
+            Status = HqSyncStatus.Pending
+        };
+        _isEditing = false;
+        _modalTestResult = "";
+        _showModal = true;
+    }
+
+    private void OpenEditModal(HqNodeConfig branch)
+    {
+        _editModel = new HqNodeConfig
+        {
+            Id = branch.Id,
+            Code = branch.Code,
+            Name = branch.Name,
+            NameEn = branch.NameEn,
+            NodeType = HqNodeType.Branch,
+            City = branch.City,
+            Address = branch.Address,
+            Phone = branch.Phone,
+            ManagerName = branch.ManagerName,
+            ApiUrl = branch.ApiUrl,
+            ApiKey = branch.ApiKey,
+            IsActive = branch.IsActive,
+            LinkedWarehouseName = branch.LinkedWarehouseName,
+            Status = branch.Status,
+            LastSyncAt = branch.LastSyncAt,
+            TodayRevenue = branch.TodayRevenue,
+            TodayOrdersCount = branch.TodayOrdersCount
+        };
+        _isEditing = true;
+        _modalTestResult = "";
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _modalTestResult = "";
+    }
+
+    private async Task TestModalConnection()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.ApiUrl))
+        {
+            _modalTestResult = "يرجى كتابة رابط السيرفر أولاً";
+            _modalTestSuccess = false;
+            return;
+        }
+
+        _isTestingModal = true;
+        _modalTestResult = "";
+        StateHasChanged();
+
+        var res = await SyncService.TestConnectionAsync(_editModel.ApiUrl);
+        _isTestingModal = false;
+        _modalTestSuccess = res.Success;
+        _modalTestResult = res.Message;
+        StateHasChanged();
+    }
+
+    private void SaveBranch()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.Code) || string.IsNullOrWhiteSpace(_editModel.Name))
+        {
+            Snackbar.Add("يرجى إدخال كود الفرع واسم الفرع", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_editModel.ApiUrl))
+        {
+            Snackbar.Add("يرجى إدخال رابط API الفرع لسحب البيانات", Severity.Warning);
+            return;
+        }
+
+        if (_isEditing)
+        {
+            SyncService.UpdateNode(_editModel);
+            Snackbar.Add("تم تحديث بيانات الفرع بنجاح", Severity.Success);
+        }
+        else
+        {
+            SyncService.AddNode(_editModel);
+            Snackbar.Add("تم إضافة الفرع الجديد بنجاح", Severity.Success);
+        }
+
+        CloseModal();
+        RefreshList();
+    }
+
+    private void DeleteBranch(HqNodeConfig branch)
+    {
+        SyncService.DeleteNode(branch.Id);
+        Snackbar.Add($"تم حذف فرع '{branch.Name}'", Severity.Info);
+        RefreshList();
+    }
+
+    private async Task TestSingleConnection(HqNodeConfig branch)
+    {
+        var res = await SyncService.TestConnectionAsync(branch.ApiUrl);
+        branch.PingLatencyMs = res.LatencyMs;
+        branch.Status = res.Success ? HqSyncStatus.Online : HqSyncStatus.Offline;
+        branch.LastSyncMessage = res.Message;
+        SyncService.SaveNodes();
+
+        if (res.Success)
+            Snackbar.Add($"الاتصال مع {branch.Name} ناجح ({res.LatencyMs} ms)", Severity.Success);
+        else
+            Snackbar.Add($"تعذر الاتصال بـ {branch.Name}: {res.Message}", Severity.Error);
+    }
+
+    private async Task PullSingleBranch(HqNodeConfig branch)
+    {
+        Snackbar.Add($"جاري سحب مبيعات وبيانات {branch.Name}...", Severity.Info);
+        var log = await SyncService.SyncBranchAsync(branch);
+        if (log.Success)
+            Snackbar.Add(log.Message, Severity.Success);
+        else
+            Snackbar.Add($"خطأ أثناء السحب: {log.Message}", Severity.Error);
+    }
+
+    private async Task TestAllConnections()
+    {
+        _isCheckingAll = true;
+        StateHasChanged();
+
+        foreach (var branch in _branches.Where(b => b.IsActive))
+        {
+            var res = await SyncService.TestConnectionAsync(branch.ApiUrl);
+            branch.PingLatencyMs = res.LatencyMs;
+            branch.Status = res.Success ? HqSyncStatus.Online : HqSyncStatus.Offline;
+            branch.LastSyncMessage = res.Message;
+        }
+
+        SyncService.SaveNodes();
+        _isCheckingAll = false;
+        Snackbar.Add("تم الانتهاء من فحص اتصال جميع الفروع", Severity.Success);
+        StateHasChanged();
+    }
+
+    private async Task SyncAllBranches()
+    {
+        Snackbar.Add("بدء سحب البيانات ومبيعات اليوم من كافة الفروع...", Severity.Info);
+        var results = await SyncService.SyncAllAsync();
+        var successCount = results.Count(r => r.Success && r.NodeType == HqNodeType.Branch);
+        Snackbar.Add($"اكتملت مزامنة الفروع! تم سحب بيانات {successCount} فرع بنجاح", Severity.Success);
+    }
+
+    private static string GetStatusClass(HqSyncStatus status) => status switch
+    {
+        HqSyncStatus.Online => "status-online",
+        HqSyncStatus.Offline => "status-offline",
+        HqSyncStatus.Syncing => "status-syncing",
+        HqSyncStatus.Error => "status-error",
+        _ => "status-pending"
+    };
+
+    private static string GetStatusLabel(HqSyncStatus status) => status switch
+    {
+        HqSyncStatus.Online => "متصل",
+        HqSyncStatus.Offline => "غير متصل",
+        HqSyncStatus.Syncing => "جاري السحب...",
+        HqSyncStatus.Error => "خطأ في الاتصال",
+        _ => "قيد الانتظار"
+    };
+
+    public void Dispose()
+    {
+        SyncService.OnSyncStateChanged -= HandleSyncChanged;
+    }
+}

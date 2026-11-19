@@ -40,7 +40,6 @@ public static class AppIdentityDbContextSeed
                 existing.ScreenEnglishName = perm.ScreenEnglishName;
                 existing.IsBackOffice = perm.IsBackOffice;
                 existing.IsWarehouse = perm.IsWarehouse;
-                existing.IsHQ = perm.IsHQ;
                 context.Permissions.Update(existing);
             }
         }

@@ -4,6 +4,12 @@ namespace HQ.Desktop.Services;
 
 public sealed class HqAnalyticsService
 {
+    private readonly HqDataSyncService? _syncService;
+
+    public HqAnalyticsService(HqDataSyncService? syncService = null)
+    {
+        _syncService = syncService;
+    }
     private static readonly string[] HourLabels =
         ["10ص", "11ص", "12م", "1م", "2م", "3م", "4م", "5م", "6م", "7م", "8م", "9م", "10م", "11م"];
 

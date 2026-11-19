@@ -1,23 +1,52 @@
 @page "/"
 @attribute [Authorize]
 @inject HqAnalyticsService Analytics
+@inject HqDataSyncService SyncService
+@inject ISnackbar Snackbar
+@implements IDisposable
 
 <div class="hq-dash" dir="rtl">
+    <!-- Executive Top Header -->
     <header class="dash-head">
-        <div>
+        <div class="head-left-info">
             <div class="title-row">
-                <h1>لوحة مقارنات المقر</h1>
-                <span class="live-pill">تحليل تشغيلي</span>
+                <div class="hq-icon-gem">
+                    <MudIcon Icon="@Icons.Material.Rounded.DashboardCustomize" Class="gold-icon" />
+                </div>
+                <div>
+                    <h1>لوحة المقارنات والرقابة المركزية (HQ Command Center)</h1>
+                    <div class="sync-status-strip">
+                        <span class="live-pulse-dot"></span>
+                        <span class="sync-text">
+                            آخر سحب شامل: @(SyncService.LastGlobalSyncTime.HasValue ? SyncService.LastGlobalSyncTime.Value.ToString("hh:mm tt") : "منذ دقائق")
+                            · @_branchesCount فروع متصلة · @_warehousesCount مخازن رئيسية
+                        </span>
+                    </div>
+                </div>
             </div>
-            <p>@_snapshot.ScopeHint</p>
         </div>
+
         <div class="head-actions">
+            <button class="global-sync-btn" @onclick="TriggerGlobalSync" disabled="@SyncService.IsGlobalSyncing">
+                @if (SyncService.IsGlobalSyncing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="spinner-gold" />
+                    <span>جاري سحب الداتا...</span>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.Sync" Size="Size.Small" />
+                    <span>سحب ومزامنة كل الفروع والمخازن</span>
+                }
+            </button>
+
             <div class="pills">
                 @foreach (var period in _periods)
                 {
                     <button class="pill @(_period == period.Key ? "on" : "")" @onclick="() => SetPeriod(period.Key)">@period.Value</button>
                 }
             </div>
+
             @if (_period == "Range")
             {
                 <div class="range">
@@ -28,10 +57,11 @@
         </div>
     </header>
 
+    <!-- Scope Filter & Company Bar -->
     <section class="scope-bar">
-        <div>
+        <div class="scope-info">
             <strong>@_snapshot.ScopeTitle</strong>
-            <span>@_snapshot.CompanyCount شركات · @_snapshot.BranchCount فرع في النطاق</span>
+            <span>@_snapshot.CompanyCount شركات · @_branchesCount فرع مرتبط · @_warehousesCount مخزن مركزي</span>
         </div>
         <div class="chips">
             @if (Analytics.Companies.Count > 1)
@@ -48,96 +78,452 @@
         </div>
     </section>
 
-    <section class="kpi-grid">
-        <article class="kpi"><span>إجمالي المبيعات</span><strong>@Money(_snapshot.Revenue)</strong><em class="@Tone(_snapshot.Growth)">@Pct(_snapshot.Growth) عن السابق</em></article>
-        <article class="kpi"><span>صافي الربح</span><strong>@Money(_snapshot.Profit)</strong><em>هامش @Pct(_snapshot.Margin)</em></article>
-        <article class="kpi"><span>الطلبات</span><strong>@_snapshot.Orders.ToString("N0")</strong><em>@_snapshot.Guests.ToString("N0") ضيف</em></article>
-        <article class="kpi"><span>متوسط الفاتورة</span><strong>@Money(_snapshot.AverageTicket)</strong><em>لكل طلب</em></article>
-        <article class="kpi"><span>الخصومات</span><strong>@Money(_snapshot.Discounts)</strong><em>@Share(_snapshot.Discounts) من المبيعات</em></article>
-        <article class="kpi"><span>الملغيات</span><strong>@Money(_snapshot.Voids)</strong><em>@Share(_snapshot.Voids) من المبيعات</em></article>
-        <article class="kpi"><span>الصالة</span><strong>@Money(_snapshot.DineIn)</strong><em>@Share(_snapshot.DineIn)</em></article>
-        <article class="kpi"><span>الدليفري + التيك أواي</span><strong>@Money(_snapshot.Delivery + _snapshot.Takeaway)</strong><em>دليفري @Share(_snapshot.Delivery)</em></article>
-    </section>
+    <!-- Navigation View Tabs -->
+    <div class="dash-tabs-bar">
+        <button class="dash-tab-btn @(_activeTab == "sales" ? "active" : "")" @onclick='() => _activeTab = "sales"'>
+            <MudIcon Icon="@Icons.Material.Rounded.Analytics" Size="Size.Small" />
+            <span>مقارنة المبيعات والفروع</span>
+        </button>
+        <button class="dash-tab-btn @(_activeTab == "warehouse" ? "active" : "")" @onclick='() => _activeTab = "warehouse"'>
+            <MudIcon Icon="@Icons.Material.Rounded.Warehouse" Size="Size.Small" />
+            <span>المخازن المركزية والتحويلات</span>
+            <span class="tab-badge">@_warehousesCount</span>
+        </button>
+        <button class="dash-tab-btn @(_activeTab == "sync-monitor" ? "active" : "")" @onclick='() => _activeTab = "sync-monitor"'>
+            <MudIcon Icon="@Icons.Material.Rounded.Dns" Size="Size.Small" />
+            <span>شاشة مراقبة الاتصال والسحب المباشر</span>
+            <span class="tab-badge success">متصل</span>
+        </button>
+        <button class="dash-tab-btn @(_activeTab == "products" ? "active" : "")" @onclick='() => _activeTab = "products"'>
+            <MudIcon Icon="@Icons.Material.Rounded.Star" Size="Size.Small" />
+            <span>المنتجات الأكثر مبيعًا</span>
+        </button>
+    </div>
 
-    <section class="chart-grid">
-        <div class="panel wide">
-            <h3>مقارنة المبيعات</h3>
-            <MudChart ChartType="ChartType.Bar" ChartSeries="_revenueSeries" XAxisLabels="_names" ChartOptions="_palette" Width="100%" Height="280px" />
-        </div>
-        <div class="panel wide">
-            <h3>اتجاه 14 يوم</h3>
-            <MudChart ChartType="ChartType.Line" ChartSeries="_trendSeries" XAxisLabels="_trendLabels" ChartOptions="_palette" Width="100%" Height="280px" />
-        </div>
-        <div class="panel">
-            <h3>قنوات البيع</h3>
-            <MudChart ChartType="ChartType.Donut" InputData="_channels" InputLabels="_channelLabels" ChartOptions="_channelPalette" Width="100%" Height="260px" />
-        </div>
-        <div class="panel">
-            <h3>طرق التحصيل</h3>
-            <MudChart ChartType="ChartType.Donut" InputData="_payments" InputLabels="_paymentLabels" ChartOptions="_paymentPalette" Width="100%" Height="260px" />
-        </div>
-        <div class="panel">
-            <h3>هامش الربح</h3>
-            <MudChart ChartType="ChartType.Bar" ChartSeries="_marginSeries" XAxisLabels="_names" ChartOptions="_palette" Width="100%" Height="260px" />
-        </div>
-        <div class="panel wide">
-            <h3>توزيع الساعات</h3>
-            <MudChart ChartType="ChartType.Bar" ChartSeries="_hourSeries" XAxisLabels="_hourLabels" ChartOptions="_palette" Width="100%" Height="280px" />
-        </div>
-    </section>
+    @if (_activeTab == "sales")
+    {
+        <!-- KPI Cards Grid -->
+        <section class="kpi-grid">
+            <article class="kpi gold-card">
+                <span>إجمالي المبيعات</span>
+                <strong>@Money(_snapshot.Revenue)</strong>
+                <em class="@Tone(_snapshot.Growth)">@Pct(_snapshot.Growth) عن الفترة السابقة</em>
+            </article>
+            <article class="kpi">
+                <span>صافي الربح التقديري</span>
+                <strong>@Money(_snapshot.Profit)</strong>
+                <em>هامش ربح @Pct(_snapshot.Margin)</em>
+            </article>
+            <article class="kpi">
+                <span>إجمالي الفواتير / الطلبات</span>
+                <strong>@_snapshot.Orders.ToString("N0")</strong>
+                <em>متوسط الفاتورة @Money(_snapshot.AverageTicket)</em>
+            </article>
+            <article class="kpi">
+                <span>مبيعات الصالة (Dine-In)</span>
+                <strong>@Money(_snapshot.DineIn)</strong>
+                <em>حصة @Share(_snapshot.DineIn) من المبيعات</em>
+            </article>
+            <article class="kpi">
+                <span>الدليفري + التيك أواي</span>
+                <strong>@Money(_snapshot.Delivery + _snapshot.Takeaway)</strong>
+                <em>دليفري @Share(_snapshot.Delivery) · سفري @Share(_snapshot.Takeaway)</em>
+            </article>
+            <article class="kpi">
+                <span>الخصومات الممنوحة</span>
+                <strong>@Money(_snapshot.Discounts)</strong>
+                <em>@Share(_snapshot.Discounts) من إجمالي الإيراد</em>
+            </article>
+            <article class="kpi">
+                <span>الملغيات (Voids)</span>
+                <strong>@Money(_snapshot.Voids)</strong>
+                <em>@Share(_snapshot.Voids) نسبة إهدار/إلغاء</em>
+            </article>
+            <article class="kpi">
+                <span>التحصيل النقدي مقابل الإلكتروني</span>
+                <strong>@Money(_snapshot.Cash) كاش</strong>
+                <em>بطاقات @Money(_snapshot.Card) · محافظ @Money(_snapshot.Wallet)</em>
+            </article>
+        </section>
 
-    <section class="bottom-grid">
-        <div class="panel">
-            <h3>قراءات سريعة</h3>
-            <ul>
-                @foreach (var insight in _snapshot.Insights)
-                {
-                    <li>@insight</li>
-                }
-            </ul>
-        </div>
-        <div class="panel table-panel">
-            <h3>جدول المقارنة</h3>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>الوحدة</th>
-                            <th>المبيعات</th>
-                            <th>النمو</th>
-                            <th>الطلبات</th>
-                            <th>متوسط الفاتورة</th>
-                            <th>الخصم</th>
-                            <th>الملغي</th>
-                            <th>الربح</th>
-                            <th>الهامش</th>
-                            <th>الحصة</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var row in _snapshot.Entities)
-                        {
-                            <tr>
-                                <td>
-                                    <b>@row.Name</b>
-                                    <small>@row.Subtitle</small>
-                                </td>
-                                <td>@Money(row.Revenue)</td>
-                                <td class="@Tone(row.Growth)">@Pct(row.Growth)</td>
-                                <td>@row.Orders.ToString("N0")</td>
-                                <td>@Money(row.AverageTicket)</td>
-                                <td>@Money(row.Discounts)</td>
-                                <td>@Money(row.Voids)</td>
-                                <td>@Money(row.Profit)</td>
-                                <td>@Pct(row.Margin)</td>
-                                <td>@Share(row.Revenue)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+        <!-- Charts Grid -->
+        <section class="chart-grid">
+            <div class="panel wide">
+                <div class="panel-head">
+                    <h3>مقارنة المبيعات بين الوحدات (Sales Comparison)</h3>
+                </div>
+                <MudChart ChartType="ChartType.Bar" ChartSeries="_revenueSeries" XAxisLabels="_names" ChartOptions="_palette" Width="100%" Height="280px" />
             </div>
-        </div>
-    </section>
+            <div class="panel wide">
+                <div class="panel-head">
+                    <h3>اتجاه المبيعات خلال 14 يومًا (Sales Trend)</h3>
+                </div>
+                <MudChart ChartType="ChartType.Line" ChartSeries="_trendSeries" XAxisLabels="_trendLabels" ChartOptions="_palette" Width="100%" Height="280px" />
+            </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>قنوات البيع (Sales Channels)</h3>
+                </div>
+                <MudChart ChartType="ChartType.Donut" InputData="_channels" InputLabels="_channelLabels" ChartOptions="_channelPalette" Width="100%" Height="260px" />
+            </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>طرق التحصيل (Payment Methods)</h3>
+                </div>
+                <MudChart ChartType="ChartType.Donut" InputData="_payments" InputLabels="_paymentLabels" ChartOptions="_paymentPalette" Width="100%" Height="260px" />
+            </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <h3>نسبة هامش الربح % (Profit Margin)</h3>
+                </div>
+                <MudChart ChartType="ChartType.Bar" ChartSeries="_marginSeries" XAxisLabels="_names" ChartOptions="_palette" Width="100%" Height="260px" />
+            </div>
+            <div class="panel wide">
+                <div class="panel-head">
+                    <h3>توزيع ساعات الذروة (Hourly Rush Hours)</h3>
+                </div>
+                <MudChart ChartType="ChartType.Bar" ChartSeries="_hourSeries" XAxisLabels="_hourLabels" ChartOptions="_palette" Width="100%" Height="280px" />
+            </div>
+        </section>
+
+        <!-- Bottom Comparison Table & Insights -->
+        <section class="bottom-grid">
+            <div class="panel insights-panel">
+                <div class="panel-head">
+                    <MudIcon Icon="@Icons.Material.Rounded.Lightbulb" Class="gold-icon" />
+                    <h3>مؤشرات تحليلية ذكية (HQ Insights)</h3>
+                </div>
+                <ul class="insights-list">
+                    @foreach (var insight in _snapshot.Insights)
+                    {
+                        <li>
+                            <MudIcon Icon="@Icons.Material.Rounded.CheckCircleOutline" Size="Size.Small" Class="gold-bullet" />
+                            <span>@insight</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+            <div class="panel table-panel">
+                <div class="panel-head">
+                    <MudIcon Icon="@Icons.Material.Rounded.TableChart" Class="gold-icon" />
+                    <h3>جدول المقارنة التفصيلي للفروع والشركات</h3>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الوحدة / الفرع</th>
+                                <th>المبيعات</th>
+                                <th>النمو</th>
+                                <th>الطلبات</th>
+                                <th>متوسط الفاتورة</th>
+                                <th>الخصم</th>
+                                <th>الملغي</th>
+                                <th>صافي الربح</th>
+                                <th>الهامش</th>
+                                <th>الحصة السوقية</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in _snapshot.Entities)
+                            {
+                                <tr>
+                                    <td>
+                                        <b>@row.Name</b>
+                                        <small>@row.Subtitle</small>
+                                    </td>
+                                    <td>@Money(row.Revenue)</td>
+                                    <td class="@Tone(row.Growth)">@Pct(row.Growth)</td>
+                                    <td>@row.Orders.ToString("N0")</td>
+                                    <td>@Money(row.AverageTicket)</td>
+                                    <td>@Money(row.Discounts)</td>
+                                    <td>@Money(row.Voids)</td>
+                                    <td>@Money(row.Profit)</td>
+                                    <td>@Pct(row.Margin)</td>
+                                    <td>@Share(row.Revenue)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    }
+    else if (_activeTab == "warehouse")
+    {
+        <!-- Central Warehouses Hub Tab -->
+        <section class="warehouse-view-section">
+            <div class="wh-summary-cards">
+                <div class="wh-stat-card">
+                    <div class="wh-card-icon">
+                        <MudIcon Icon="@Icons.Material.Rounded.AccountBalanceWallet" Class="gold-icon" />
+                    </div>
+                    <div>
+                        <span class="wh-stat-title">إجمالي تقييم المخزون المركزي</span>
+                        <strong class="wh-stat-value gold-text">@(_whSummaries.Sum(w => w.TotalValuation).ToString("N0")) ج.م</strong>
+                        <small class="wh-stat-sub">موزعة على @_whSummaries.Count مخازن مركزية</small>
+                    </div>
+                </div>
+
+                <div class="wh-stat-card">
+                    <div class="wh-card-icon">
+                        <MudIcon Icon="@Icons.Material.Rounded.WarningAmber" Class="warning-icon" />
+                    </div>
+                    <div>
+                        <span class="wh-stat-title">أصناف تحت حد الطلب (نواقص)</span>
+                        <strong class="wh-stat-value warning-text">@(_whSummaries.Sum(w => w.LowStockCount)) أصناف</strong>
+                        <small class="wh-stat-sub">تتطلب إصدار أوامر شراء عاجلة للموردين</small>
+                    </div>
+                </div>
+
+                <div class="wh-stat-card">
+                    <div class="wh-card-icon">
+                        <MudIcon Icon="@Icons.Material.Rounded.MoveToInbox" Class="info-icon" />
+                    </div>
+                    <div>
+                        <span class="wh-stat-title">طلبيات الفروع المعلقة</span>
+                        <strong class="wh-stat-value info-text">@(_whSummaries.Sum(w => w.PendingRequisitionsCount)) طلبيات</strong>
+                        <small class="wh-stat-sub">بانتظار الصرف والشحن من المخزن المركزي</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Central Warehouse Low Stock & Requisitions Split Grid -->
+            <div class="wh-split-grid">
+                <!-- Low Stock Alert Table -->
+                <div class="panel">
+                    <div class="panel-head">
+                        <MudIcon Icon="@Icons.Material.Rounded.ReportProblem" Class="warning-icon" />
+                        <h3>تنبيهات الأصناف قاربت على النفاد بالمخازن الرئيسية</h3>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>كود الصنف</th>
+                                    <th>اسم الصنف / المادة الخام</th>
+                                    <th>الرصيد الحالي</th>
+                                    <th>حد إعادة الطلب</th>
+                                    <th>سعر التكلفة</th>
+                                    <th>الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in _whSummaries.SelectMany(w => w.LowStockAlerts))
+                                {
+                                    <tr>
+                                        <td><code>@item.ProductCode</code></td>
+                                        <td><b>@item.ProductName</b></td>
+                                        <td class="danger-text">@item.CurrentBalance.ToString("N0") @item.Unit</td>
+                                        <td>@item.MinReorderPoint.ToString("N0") @item.Unit</td>
+                                        <td>@item.CostPrice.ToString("N0") ج.م</td>
+                                        <td><span class="badge-danger">أمر شراء مطلوب</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pending Branch Requisitions Table -->
+                <div class="panel">
+                    <div class="panel-head">
+                        <MudIcon Icon="@Icons.Material.Rounded.LocalShipping" Class="gold-icon" />
+                        <h3>طلبيات تحويل البضائع من الفروع إلى المخزن المركزي</h3>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>رقم الطلبية</th>
+                                    <th>الفرع الطالب</th>
+                                    <th>التوقيت</th>
+                                    <th>عدد البنود</th>
+                                    <th>القيمة التقديرية</th>
+                                    <th>الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var req in _whSummaries.SelectMany(w => w.PendingRequisitions))
+                                {
+                                    <tr>
+                                        <td><b>@req.RequisitionNumber</b></td>
+                                        <td>@req.BranchName</td>
+                                        <td>@req.RequestDate.ToString("hh:mm tt")</td>
+                                        <td>@req.ItemsCount صنف</td>
+                                        <td>@req.EstimatedTotal.ToString("N0") ج.م</td>
+                                        <td><span class="badge-gold">@req.Status</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+    else if (_activeTab == "sync-monitor")
+    {
+        <!-- Live Nodes Sync Monitor Tab -->
+        <section class="sync-monitor-section">
+            <div class="panel">
+                <div class="panel-head">
+                    <MudIcon Icon="@Icons.Material.Rounded.Router" Class="gold-icon" />
+                    <h3>حالة الاتصال وسحب البيانات لجميع الفروع والمخازن المسجلة بالـ HQ</h3>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الكود</th>
+                                <th>اسم العقدة / الفرع / المخزن</th>
+                                <th>النوع</th>
+                                <th>المدينة</th>
+                                <th>رابط السيرفر (API URL)</th>
+                                <th>سرعة الاستجابة (Ping)</th>
+                                <th>مبيعات / تقييم اليوم</th>
+                                <th>حالة الاتصال</th>
+                                <th>آخر سحب</th>
+                                <th>إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var node in SyncService.Nodes)
+                            {
+                                <tr>
+                                    <td><code>@node.Code</code></td>
+                                    <td><b>@node.Name</b></td>
+                                    <td>
+                                        <span class="node-type-pill @(node.NodeType == HqNodeType.Branch ? "branch-type" : "wh-type")">
+                                            @(node.NodeType == HqNodeType.Branch ? "فرع بيع" : "مخزن رئيسي")
+                                        </span>
+                                    </td>
+                                    <td>@node.City</td>
+                                    <td class="ltr-cell">@node.ApiUrl</td>
+                                    <td>@(node.PingLatencyMs.HasValue ? $"{node.PingLatencyMs} ms" : "-")</td>
+                                    <td>
+                                        @(node.NodeType == HqNodeType.Branch 
+                                            ? $"{node.TodayRevenue:N0} ج.م ({node.TodayOrdersCount} طلب)" 
+                                            : $"{node.StockValuation:N0} ج.م")
+                                    </td>
+                                    <td>
+                                        <span class="status-indicator-badge @GetStatusClass(node.Status)">
+                                            @GetStatusLabel(node.Status)
+                                        </span>
+                                    </td>
+                                    <td>@(node.LastSyncAt.HasValue ? node.LastSyncAt.Value.ToString("hh:mm:ss tt") : "غير مسحوب")</td>
+                                    <td>
+                                        <button class="node-quick-sync-btn" @onclick="() => SyncSingleNode(node)" title="سحب بيانات هذه العقدة الآن">
+                                            <MudIcon Icon="@Icons.Material.Rounded.Refresh" Size="Size.Small" />
+                                            <span>سحب</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Sync Activity Logs Table -->
+            <div class="panel mt-4">
+                <div class="panel-head">
+                    <MudIcon Icon="@Icons.Material.Rounded.HistoryEdu" Class="gold-icon" />
+                    <h3>سجل عمليات سحب البيانات والمزامنة الأخيرة (HQ Data Pulling Log)</h3>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الوقت</th>
+                                <th>العقدة</th>
+                                <th>النوع</th>
+                                <th>العملية المنفذة</th>
+                                <th>المدة</th>
+                                <th>السجلات المسحوبة</th>
+                                <th>الحالة</th>
+                                <th>تفاصيل العملية</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (SyncService.RecentLogs.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center py-4 text-muted">لا توجد عمليات سحب مسجلة في الجلسة الحالية. اضغط "سحب ومزامنة كل الفروع" لبدء السحب.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var log in SyncService.RecentLogs)
+                                {
+                                    <tr>
+                                        <td>@log.Timestamp.ToString("hh:mm:ss tt")</td>
+                                        <td><b>@log.NodeName</b></td>
+                                        <td>@(log.NodeType == HqNodeType.Branch ? "فرع" : "مخزن")</td>
+                                        <td>@log.Action</td>
+                                        <td>@log.DurationMs ms</td>
+                                        <td>@log.RecordsCount سجل</td>
+                                        <td>
+                                            <span class="badge-status @(log.Success ? "success" : "danger")">
+                                                @(log.Success ? "ناجحة" : "فشلت")
+                                            </span>
+                                        </td>
+                                        <td>@log.Message</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    }
+    else if (_activeTab == "products")
+    {
+        <!-- Top Products Across Branches Tab -->
+        <section class="products-tab-section">
+            <div class="panel">
+                <div class="panel-head">
+                    <MudIcon Icon="@Icons.Material.Rounded.Stars" Class="gold-icon" />
+                    <h3>المنتجات الأكثر مبيعًا وتحقيقًا للإيرادات على مستوى جميع الفروع</h3>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>اسم الصنف / الوجبة</th>
+                                <th>التصنيف</th>
+                                <th>الكمية الإجمالية المباعة</th>
+                                <th>إجمالي المبيعات المحققة</th>
+                                <th>الفرع الأكثر مبيعًا لهذا الصنف</th>
+                                <th>نسبة النمو</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ var rank = 1; }
+                            @foreach (var p in _topProducts)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="rank-badge @(rank == 1 ? "gold" : rank == 2 ? "silver" : rank == 3 ? "bronze" : "")">@rank</span>
+                                    </td>
+                                    <td><b>@p.Name</b></td>
+                                    <td>@p.Category</td>
+                                    <td><b>@p.TotalQuantitySold.ToString("N0")</b> قطعة</td>
+                                    <td class="gold-text"><b>@p.TotalRevenue.ToString("N0") ج.م</b></td>
+                                    <td><span class="badge-branch">@p.TopSellingBranch</span></td>
+                                    <td class="success-text">+@p.GrowthPercentage%</td>
+                                </tr>
+                                rank++;
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    }
 </div>
 
 @code {
@@ -149,6 +535,7 @@
         ["Range"] = "مدة"
     };
 
+    private string _activeTab = "sales";
     private readonly string[] _channelLabels = ["صالة", "دليفري", "تيك أواي"];
     private readonly string[] _paymentLabels = ["كاش", "بطاقة", "محفظة"];
     private readonly ChartOptions _palette = new()
@@ -173,7 +560,25 @@
     private double[] _channels = [];
     private double[] _payments = [];
 
-    protected override void OnInitialized() => Reload();
+    private int _branchesCount;
+    private int _warehousesCount;
+    private List<HqCentralWarehouseSummary> _whSummaries = new();
+    private List<HqTopProductMetric> _topProducts = new();
+
+    protected override void OnInitialized()
+    {
+        SyncService.OnSyncStateChanged += HandleSyncStateChanged;
+        Reload();
+    }
+
+    private void HandleSyncStateChanged()
+    {
+        InvokeAsync(() =>
+        {
+            Reload();
+            StateHasChanged();
+        });
+    }
 
     private void SetPeriod(string period)
     {
@@ -212,10 +617,61 @@
         _hourSeries = entities.Select(e => new ChartSeries { Name = e.Name, Data = e.Hourly }).ToList();
         _channels = [(double)_snapshot.DineIn, (double)_snapshot.Delivery, (double)_snapshot.Takeaway];
         _payments = [(double)_snapshot.Cash, (double)_snapshot.Card, (double)_snapshot.Wallet];
+
+        _branchesCount = SyncService.Branches.Count;
+        _warehousesCount = SyncService.MainWarehouses.Count;
+        _whSummaries = SyncService.GetWarehouseSummaries();
+        _topProducts = SyncService.GetTopProducts();
+    }
+
+    private async Task TriggerGlobalSync()
+    {
+        Snackbar.Add("بدء سحب ومزامنة البيانات من كل الفروع والمخازن المسجلة...", Severity.Info);
+        var results = await SyncService.SyncAllAsync();
+        var successCount = results.Count(r => r.Success);
+        Snackbar.Add($"اكتمل السحب الشامل! تم تحديث {successCount} من أصل {results.Count} عقدة بنجاح", Severity.Success);
+    }
+
+    private async Task SyncSingleNode(HqNodeConfig node)
+    {
+        Snackbar.Add($"جاري سحب بيانات {node.Name}...", Severity.Info);
+        HqSyncLogEntry log;
+        if (node.NodeType == HqNodeType.Branch)
+            log = await SyncService.SyncBranchAsync(node);
+        else
+            log = await SyncService.SyncWarehouseAsync(node);
+
+        if (log.Success)
+            Snackbar.Add(log.Message, Severity.Success);
+        else
+            Snackbar.Add(log.Message, Severity.Error);
     }
 
     private static string Money(decimal value) => $"{value:N0} ج.م";
     private static string Pct(decimal value) => value.ToString("P1");
     private string Share(decimal value) => _snapshot.Revenue == 0 ? "0%" : (value / _snapshot.Revenue).ToString("P1");
     private static string Tone(decimal value) => value >= 0 ? "up" : "down";
+
+    private static string GetStatusClass(HqSyncStatus status) => status switch
+    {
+        HqSyncStatus.Online => "status-online",
+        HqSyncStatus.Offline => "status-offline",
+        HqSyncStatus.Syncing => "status-syncing",
+        HqSyncStatus.Error => "status-error",
+        _ => "status-pending"
+    };
+
+    private static string GetStatusLabel(HqSyncStatus status) => status switch
+    {
+        HqSyncStatus.Online => "متصل",
+        HqSyncStatus.Offline => "غير متصل",
+        HqSyncStatus.Syncing => "جاري السحب",
+        HqSyncStatus.Error => "خطأ اتصال",
+        _ => "قيد الانتظار"
+    };
+
+    public void Dispose()
+    {
+        SyncService.OnSyncStateChanged -= HandleSyncStateChanged;
+    }
 }

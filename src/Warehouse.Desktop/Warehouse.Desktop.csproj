@@ -14,6 +14,11 @@
 
   <ItemGroup>
     <Content Include="Warehouse.ico" />
+    <!-- install.bat: IIS setup script included in publish output -->
+    <Content Include="install.bat">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

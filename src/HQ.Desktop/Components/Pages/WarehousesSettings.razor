@@ -1,0 +1,536 @@
+@page "/warehouses-settings"
+@attribute [Authorize]
+@inject HqDataSyncService SyncService
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<div class="warehouses-page" dir="rtl">
+    <!-- Header with Luxury Gold Accent -->
+    <header class="page-head">
+        <div class="head-info">
+            <div class="title-with-badge">
+                <div class="icon-circle">
+                    <MudIcon Icon="@Icons.Material.Rounded.Warehouse" Size="Size.Large" Class="gold-icon" />
+                </div>
+                <div>
+                    <h1>إعدادات المخازن الرئيسية والمركزية</h1>
+                    <p class="subtitle">تكوين روابط سيرفرات المخازن المركزية، فحص الاتصال، وسحب أرصدة المخزون والتحويلات للفروع</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="head-stats">
+            <div class="stat-pill">
+                <span>المخازن الرئيسية</span>
+                <strong>@_warehouses.Count</strong>
+            </div>
+            <div class="stat-pill success">
+                <span>مخازن متصلة</span>
+                <strong>@_warehouses.Count(w => w.Status == HqSyncStatus.Online)</strong>
+            </div>
+            <div class="stat-pill gold">
+                <span>إجمالي تقييم المخزون</span>
+                <strong>@(_warehouses.Sum(w => w.StockValuation).ToString("N0")) ج.م</strong>
+            </div>
+        </div>
+    </header>
+
+    <!-- Control & Action Toolbar -->
+    <div class="action-bar">
+        <div class="search-filter-box">
+            <div class="input-search-wrapper">
+                <MudIcon Icon="@Icons.Material.Rounded.Search" Class="search-icon" />
+                <input type="text" class="custom-search-input" placeholder="ابحث باسم المخزن أو الكود أو المدينة..."
+                       @bind="_searchTerm" @bind:event="oninput" />
+            </div>
+
+            <select class="custom-status-select" @bind="_selectedStatusFilter">
+                <option value="all">كل الحالات</option>
+                <option value="online">متصل فقط</option>
+                <option value="offline">غير متصل</option>
+                <option value="active">نشط فقط</option>
+            </select>
+        </div>
+
+        <div class="top-action-buttons">
+            <button class="gold-action-btn primary" @onclick="OpenAddModal">
+                <MudIcon Icon="@Icons.Material.Rounded.AddHomeWork" Size="Size.Small" />
+                <span>إضافة مخزن رئيسي جديد</span>
+            </button>
+            <button class="gold-action-btn secondary" @onclick="TestAllConnections" disabled="@_isCheckingAll">
+                @if (_isCheckingAll)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="spinner-gold" />
+                    <span>جاري الفحص...</span>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.WifiFind" Size="Size.Small" />
+                    <span>فحص اتصال المخازن</span>
+                }
+            </button>
+            <button class="gold-action-btn sync-btn" @onclick="SyncAllWarehouses" disabled="@SyncService.IsGlobalSyncing">
+                @if (SyncService.IsGlobalSyncing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="spinner-gold" />
+                    <span>جاري سحب المخزون...</span>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.Inventory" Size="Size.Small" />
+                    <span>سحب أرصدة المخازن</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <!-- Warehouse Cards Grid -->
+    <div class="warehouses-grid">
+        @if (FilteredWarehouses.Count == 0)
+        {
+            <div class="empty-state">
+                <MudIcon Icon="@Icons.Material.Rounded.Inventory2" Size="Size.Large" Class="empty-icon" />
+                <h3>لا توجد مخازن رئيسية مطابقة للبحث</h3>
+                <p>قم بإضافة مخزن رئيسي مركزي لربطه بالـ HQ ومراقبة الأرصدة والتحويلات</p>
+                <button class="gold-action-btn primary mt-2" @onclick="OpenAddModal">إضافة أول مخزن</button>
+            </div>
+        }
+        else
+        {
+            @foreach (var wh in FilteredWarehouses)
+            {
+                <div class="warehouse-card @(wh.IsActive ? "" : "disabled-card")">
+                    <div class="card-top-header">
+                        <div class="code-and-title">
+                            <span class="wh-code-badge">@wh.Code</span>
+                            <div>
+                                <h3 class="wh-name">@wh.Name</h3>
+                                <span class="wh-city">@wh.City @(string.IsNullOrWhiteSpace(wh.Address) ? "" : $"· {wh.Address}")</span>
+                            </div>
+                        </div>
+                        <div class="status-indicator-badge @GetStatusClass(wh.Status)">
+                            <span class="status-dot"></span>
+                            <span>@GetStatusLabel(wh.Status)</span>
+                            @if (wh.PingLatencyMs.HasValue && wh.Status == HqSyncStatus.Online)
+                            {
+                                <small>(@wh.PingLatencyMs ms)</small>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Warehouse Metric Stats Strip -->
+                    <div class="wh-stats-strip">
+                        <div class="strip-item">
+                            <span class="strip-label">تقييم المخزون</span>
+                            <span class="strip-val gold-val">@wh.StockValuation.ToString("N0") ج.م</span>
+                        </div>
+                        <div class="strip-item">
+                            <span class="strip-label">الأصناف المتاحة</span>
+                            <span class="strip-val">@wh.StockItemsCount صنف</span>
+                        </div>
+                        <div class="strip-item">
+                            <span class="strip-label">أصناف قاربت على النفاد</span>
+                            <span class="strip-val danger-val">@wh.LowStockItemsCount أصناف</span>
+                        </div>
+                    </div>
+
+                    <div class="card-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">رابط السيرفر (API URL):</span>
+                            <span class="detail-val api-url" title="@wh.ApiUrl">@wh.ApiUrl</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">مدير المخزن الرئيسي:</span>
+                            <span class="detail-val">@(string.IsNullOrWhiteSpace(wh.ManagerName) ? "-" : wh.ManagerName)</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">رقم الهاتف:</span>
+                            <span class="detail-val">@(string.IsNullOrWhiteSpace(wh.Phone) ? "-" : wh.Phone)</span>
+                        </div>
+                    </div>
+
+                    <div class="last-sync-bar">
+                        <MudIcon Icon="@Icons.Material.Rounded.History" Size="Size.Small" Class="sync-time-icon" />
+                        <span>آخر جرد وسحب: @(wh.LastSyncAt.HasValue ? wh.LastSyncAt.Value.ToString("yyyy-MM-dd hh:mm tt") : "لم يتم الجرد بعد")</span>
+                    </div>
+
+                    <div class="card-footer-actions">
+                        <button class="footer-btn ping-btn" title="فحص اتصال سيرفر المخزن" @onclick="() => TestSingleConnection(wh)">
+                            <MudIcon Icon="@Icons.Material.Rounded.NetworkPing" Size="Size.Small" />
+                            <span>فحص الاتصال</span>
+                        </button>
+                        <button class="footer-btn pull-btn" title="سحب أرصدة وتحويلات المخزن الآن" @onclick="() => PullSingleWarehouse(wh)">
+                            <MudIcon Icon="@Icons.Material.Rounded.CloudDownload" Size="Size.Small" />
+                            <span>سحب المخزون</span>
+                        </button>
+                        <button class="footer-btn edit-btn" title="تعديل بيانات المخزن" @onclick="() => OpenEditModal(wh)">
+                            <MudIcon Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" />
+                            <span>تعديل</span>
+                        </button>
+                        <button class="footer-btn delete-btn" title="حذف المخزن" @onclick="() => DeleteWarehouse(wh)">
+                            <MudIcon Icon="@Icons.Material.Rounded.DeleteOutline" Size="Size.Small" />
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<!-- Add / Edit Modal Dialog -->
+@if (_showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-dialog-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <div class="title-with-icon">
+                    <MudIcon Icon="@(_isEditing ? Icons.Material.Rounded.EditCalendar : Icons.Material.Rounded.AddHomeWork)" Class="modal-gold-icon" />
+                    <h2>@(_isEditing ? "تعديل بيانات المخزن الرئيسي والربط" : "إضافة مخزن رئيسي مركزي جديد")</h2>
+                </div>
+                <button class="close-modal-btn" @onclick="CloseModal">
+                    <MudIcon Icon="@Icons.Material.Rounded.Close" />
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <div class="form-row two-cols">
+                    <div class="form-field">
+                        <label>كود المخزن (Code) *</label>
+                        <input type="text" class="modal-input" placeholder="مثال: WH-MAIN-03" @bind="_editModel.Code" />
+                    </div>
+                    <div class="form-field">
+                        <label>اسم المخزن بالعربي *</label>
+                        <input type="text" class="modal-input" placeholder="مثال: المخزن الإقليمي - الدلتا" @bind="_editModel.Name" />
+                    </div>
+                </div>
+
+                <div class="form-row two-cols">
+                    <div class="form-field">
+                        <label>اسم المخزن بالإنجليزي</label>
+                        <input type="text" class="modal-input" placeholder="Delta Regional Warehouse" @bind="_editModel.NameEn" />
+                    </div>
+                    <div class="form-field">
+                        <label>المدينة / المنطقة الصناعية *</label>
+                        <input type="text" class="modal-input" placeholder="طنطا - المنطقة الصناعية" @bind="_editModel.City" />
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>عنوان المخزن بالتفصيل</label>
+                        <input type="text" class="modal-input" placeholder="مجمع المخازن المركزية، طريق المحلة" @bind="_editModel.Address" />
+                    </div>
+                </div>
+
+                <div class="form-row two-cols">
+                    <div class="form-field">
+                        <label>اسم مدير المخزن</label>
+                        <input type="text" class="modal-input" placeholder="م / أشرف كمال" @bind="_editModel.ManagerName" />
+                    </div>
+                    <div class="form-field">
+                        <label>رقم هاتف المخزن</label>
+                        <input type="text" class="modal-input" placeholder="010XXXXXXXX" @bind="_editModel.Phone" />
+                    </div>
+                </div>
+
+                <!-- API Connection Section -->
+                <div class="modal-section-box">
+                    <div class="section-title">
+                        <MudIcon Icon="@Icons.Material.Rounded.Dns" Size="Size.Small" Class="gold-icon" />
+                        <span>بيانات سيرفر المخزن لسحب الأرصدة (Warehouse API Endpoint)</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label>رابط API سيرفر المخزن (Warehouse Server URL) *</label>
+                            <div class="input-with-button">
+                                <input type="text" class="modal-input" placeholder="http://100.79.100.86:5050" @bind="_editModel.ApiUrl" />
+                                <button type="button" class="test-conn-btn" @onclick="TestModalConnection" disabled="@_isTestingModal">
+                                    @if (_isTestingModal)
+                                    {
+                                        <span>جاري الفحص...</span>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Rounded.FlashOn" Size="Size.Small" />
+                                        <span>فحص الاتصال</span>
+                                    }
+                                </button>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_modalTestResult))
+                            {
+                                <div class="test-result-msg @(_modalTestSuccess ? "success" : "error")">
+                                    <MudIcon Icon="@(_modalTestSuccess ? Icons.Material.Rounded.CheckCircle : Icons.Material.Rounded.ErrorOutline)" Size="Size.Small" />
+                                    <span>@_modalTestResult</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-field">
+                            <label>مفتاح التوثيق / Token (اختياري)</label>
+                            <input type="password" class="modal-input" placeholder="Bearer Token / Secret" @bind="_editModel.ApiKey" />
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="modal-checkbox-label">
+                            <input type="checkbox" @bind="_editModel.IsActive" />
+                            <span>تفعيل المخزن لجلب بيانات الأرصدة والطلبيات تلقائيًا في الـ HQ</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="modal-btn cancel" @onclick="CloseModal">إلغاء</button>
+                <button class="modal-btn save" @onclick="SaveWarehouse">
+                    <MudIcon Icon="@Icons.Material.Rounded.Save" Size="Size.Small" />
+                    <span>حفظ البيانات</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<HqNodeConfig> _warehouses = new();
+    private string _searchTerm = "";
+    private string _selectedStatusFilter = "all";
+    private bool _isCheckingAll = false;
+    private bool _showModal = false;
+    private bool _isEditing = false;
+    private HqNodeConfig _editModel = new();
+    private bool _isTestingModal = false;
+    private string _modalTestResult = "";
+    private bool _modalTestSuccess = false;
+
+    private List<HqNodeConfig> FilteredWarehouses
+    {
+        get
+        {
+            var query = _warehouses.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim();
+                query = query.Where(w => 
+                    w.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    w.Code.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    w.City.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(w.ManagerName) && w.ManagerName.Contains(term, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            query = _selectedStatusFilter switch
+            {
+                "online" => query.Where(w => w.Status == HqSyncStatus.Online),
+                "offline" => query.Where(w => w.Status != HqSyncStatus.Online),
+                "active" => query.Where(w => w.IsActive),
+                _ => query
+            };
+
+            return query.OrderBy(w => w.Code).ToList();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        SyncService.OnSyncStateChanged += HandleSyncChanged;
+        RefreshList();
+    }
+
+    private void HandleSyncChanged()
+    {
+        InvokeAsync(() =>
+        {
+            RefreshList();
+            StateHasChanged();
+        });
+    }
+
+    private void RefreshList()
+    {
+        _warehouses = SyncService.MainWarehouses.ToList();
+    }
+
+    private void OpenAddModal()
+    {
+        var count = _warehouses.Count + 1;
+        _editModel = new HqNodeConfig
+        {
+            NodeType = HqNodeType.MainWarehouse,
+            Code = $"WH-MAIN-{(count < 10 ? "0" : "")}{count}",
+            City = "القاهرة",
+            ApiUrl = "http://100.79.100.86:5050",
+            IsActive = true,
+            Status = HqSyncStatus.Pending
+        };
+        _isEditing = false;
+        _modalTestResult = "";
+        _showModal = true;
+    }
+
+    private void OpenEditModal(HqNodeConfig wh)
+    {
+        _editModel = new HqNodeConfig
+        {
+            Id = wh.Id,
+            Code = wh.Code,
+            Name = wh.Name,
+            NameEn = wh.NameEn,
+            NodeType = HqNodeType.MainWarehouse,
+            City = wh.City,
+            Address = wh.Address,
+            Phone = wh.Phone,
+            ManagerName = wh.ManagerName,
+            ApiUrl = wh.ApiUrl,
+            ApiKey = wh.ApiKey,
+            IsActive = wh.IsActive,
+            Status = wh.Status,
+            LastSyncAt = wh.LastSyncAt,
+            StockValuation = wh.StockValuation,
+            StockItemsCount = wh.StockItemsCount,
+            LowStockItemsCount = wh.LowStockItemsCount
+        };
+        _isEditing = true;
+        _modalTestResult = "";
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _modalTestResult = "";
+    }
+
+    private async Task TestModalConnection()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.ApiUrl))
+        {
+            _modalTestResult = "يرجى كتابة رابط سيرفر المخزن أولاً";
+            _modalTestSuccess = false;
+            return;
+        }
+
+        _isTestingModal = true;
+        _modalTestResult = "";
+        StateHasChanged();
+
+        var res = await SyncService.TestConnectionAsync(_editModel.ApiUrl);
+        _isTestingModal = false;
+        _modalTestSuccess = res.Success;
+        _modalTestResult = res.Message;
+        StateHasChanged();
+    }
+
+    private void SaveWarehouse()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.Code) || string.IsNullOrWhiteSpace(_editModel.Name))
+        {
+            Snackbar.Add("يرجى إدخال كود المخزن واسم المخزن", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_editModel.ApiUrl))
+        {
+            Snackbar.Add("يرجى إدخال رابط API سيرفر المخزن", Severity.Warning);
+            return;
+        }
+
+        if (_isEditing)
+        {
+            SyncService.UpdateNode(_editModel);
+            Snackbar.Add("تم تحديث بيانات المخزن الرئيسي بنجاح", Severity.Success);
+        }
+        else
+        {
+            SyncService.AddNode(_editModel);
+            Snackbar.Add("تم إضافة المخزن الرئيسي الجديد بنجاح", Severity.Success);
+        }
+
+        CloseModal();
+        RefreshList();
+    }
+
+    private void DeleteWarehouse(HqNodeConfig wh)
+    {
+        SyncService.DeleteNode(wh.Id);
+        Snackbar.Add($"تم حذف المخزن '{wh.Name}'", Severity.Info);
+        RefreshList();
+    }
+
+    private async Task TestSingleConnection(HqNodeConfig wh)
+    {
+        var res = await SyncService.TestConnectionAsync(wh.ApiUrl);
+        wh.PingLatencyMs = res.LatencyMs;
+        wh.Status = res.Success ? HqSyncStatus.Online : HqSyncStatus.Offline;
+        wh.LastSyncMessage = res.Message;
+        SyncService.SaveNodes();
+
+        if (res.Success)
+            Snackbar.Add($"الاتصال مع {wh.Name} ناجح ({res.LatencyMs} ms)", Severity.Success);
+        else
+            Snackbar.Add($"تعذر الاتصال بـ {wh.Name}: {res.Message}", Severity.Error);
+    }
+
+    private async Task PullSingleWarehouse(HqNodeConfig wh)
+    {
+        Snackbar.Add($"جاري سحب أرصدة وتحويلات {wh.Name}...", Severity.Info);
+        var log = await SyncService.SyncWarehouseAsync(wh);
+        if (log.Success)
+            Snackbar.Add(log.Message, Severity.Success);
+        else
+            Snackbar.Add($"خطأ أثناء السحب: {log.Message}", Severity.Error);
+    }
+
+    private async Task TestAllConnections()
+    {
+        _isCheckingAll = true;
+        StateHasChanged();
+
+        foreach (var wh in _warehouses.Where(w => w.IsActive))
+        {
+            var res = await SyncService.TestConnectionAsync(wh.ApiUrl);
+            wh.PingLatencyMs = res.LatencyMs;
+            wh.Status = res.Success ? HqSyncStatus.Online : HqSyncStatus.Offline;
+            wh.LastSyncMessage = res.Message;
+        }
+
+        SyncService.SaveNodes();
+        _isCheckingAll = false;
+        Snackbar.Add("تم الانتهاء من فحص اتصال جميع المخازن الرئيسية", Severity.Success);
+        StateHasChanged();
+    }
+
+    private async Task SyncAllWarehouses()
+    {
+        Snackbar.Add("بدء سحب أرصدة المخزون والتحويلات من كافة المخازن الرئيسية...", Severity.Info);
+        var results = await SyncService.SyncAllAsync();
+        var successCount = results.Count(r => r.Success && r.NodeType == HqNodeType.MainWarehouse);
+        Snackbar.Add($"اكتملت مزامنة المخازن! تم سحب أرصدة {successCount} مخزن بنجاح", Severity.Success);
+    }
+
+    private static string GetStatusClass(HqSyncStatus status) => status switch
+    {
+        HqSyncStatus.Online => "status-online",
+        HqSyncStatus.Offline => "status-offline",
+        HqSyncStatus.Syncing => "status-syncing",
+        HqSyncStatus.Error => "status-error",
+        _ => "status-pending"
+    };
+
+    private static string GetStatusLabel(HqSyncStatus status) => status switch
+    {
+        HqSyncStatus.Online => "متصل",
+        HqSyncStatus.Offline => "غير متصل",
+        HqSyncStatus.Syncing => "جاري السحب...",
+        HqSyncStatus.Error => "خطأ في الاتصال",
+        _ => "قيد الانتظار"
+    };
+
+    public void Dispose()
+    {
+        SyncService.OnSyncStateChanged -= HandleSyncChanged;
+    }
+}

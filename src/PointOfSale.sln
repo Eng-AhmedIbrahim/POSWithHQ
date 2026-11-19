@@ -35,8 +35,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{881589
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Contract.Common", "Contract.Common", "{17AFC6CD-8903-581A-0AB0-FB508458C341}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HQ.Desktop", "HQ.Desktop\HQ.Desktop.csproj", "{64766097-C8DA-463E-963B-0D8AF9876FD0}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -215,18 +213,6 @@ Global
 		{6C19C3C7-0EFD-494A-8A48-05DE56A75902}.Release|x64.Build.0 = Release|Any CPU
 		{6C19C3C7-0EFD-494A-8A48-05DE56A75902}.Release|x86.ActiveCfg = Release|Any CPU
 		{6C19C3C7-0EFD-494A-8A48-05DE56A75902}.Release|x86.Build.0 = Release|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Debug|x64.Build.0 = Debug|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Debug|x86.Build.0 = Debug|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Release|x64.ActiveCfg = Release|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Release|x64.Build.0 = Release|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Release|x86.ActiveCfg = Release|Any CPU
-		{64766097-C8DA-463E-963B-0D8AF9876FD0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

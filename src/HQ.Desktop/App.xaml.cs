@@ -78,6 +78,7 @@ public partial class App : Application
         // Authentication & Business Services
         services.AddSingleton<HqAuthStateProvider>();
         services.AddSingleton<AuthenticationStateProvider>(sp => sp.GetRequiredService<HqAuthStateProvider>());
+        services.AddSingleton<HqDataSyncService>();
         services.AddSingleton<HqAnalyticsService>();
 
         _serviceProvider = services.BuildServiceProvider();
