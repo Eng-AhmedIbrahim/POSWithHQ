@@ -100,40 +100,61 @@
             @foreach (var branch in FilteredBranches)
             {
                 <div class="branch-card @(branch.IsActive ? "" : "disabled-card")">
+                    <!-- Card Header Row -->
                     <div class="card-top-header">
-                        <div class="code-and-title">
+                        <div class="header-left">
                             <span class="branch-code-badge">@branch.Code</span>
-                            <div>
-                                <h3 class="branch-name">@branch.Name</h3>
-                                <span class="branch-city">@branch.City @(string.IsNullOrWhiteSpace(branch.Address) ? "" : $"· {branch.Address}")</span>
+                            <div class="status-badges-row">
+                                <div class="status-indicator-badge @GetStatusClass(branch.Status)">
+                                    <span class="status-dot"></span>
+                                    <span class="status-label-txt">@GetStatusLabel(branch.Status)</span>
+                                </div>
+                                @if (branch.PingLatencyMs.HasValue && branch.Status == HqSyncStatus.Online)
+                                {
+                                    <span class="latency-pill" dir="ltr">@branch.PingLatencyMs ms</span>
+                                }
                             </div>
                         </div>
-                        <div class="status-indicator-badge @GetStatusClass(branch.Status)">
-                            <span class="status-dot"></span>
-                            <span>@GetStatusLabel(branch.Status)</span>
-                            @if (branch.PingLatencyMs.HasValue && branch.Status == HqSyncStatus.Online)
-                            {
-                                <small>(@branch.PingLatencyMs ms)</small>
-                            }
+                        <div class="header-right">
+                            <h3 class="branch-name">@branch.Name</h3>
+                            <span class="branch-city">@branch.City @(string.IsNullOrWhiteSpace(branch.Address) ? "" : $"· {branch.Address}")</span>
                         </div>
                     </div>
 
+                    <!-- Revenue Stats Strip -->
+                    <div class="branch-stats-strip">
+                        <div class="strip-item">
+                            <span class="strip-label">مبيعات اليوم</span>
+                            <span class="strip-val gold-val">@branch.TodayRevenue.ToString("N0") <small>ج.م</small></span>
+                        </div>
+                        <div class="strip-divider"></div>
+                        <div class="strip-item">
+                            <span class="strip-label">عدد الطلبات</span>
+                            <span class="strip-val">@branch.TodayOrdersCount <small>طلب</small></span>
+                        </div>
+                        <div class="strip-divider"></div>
+                        <div class="strip-item">
+                            <span class="strip-label">متوسط الفاتورة</span>
+                            <span class="strip-val">@(branch.TodayOrdersCount > 0 ? (branch.TodayRevenue / branch.TodayOrdersCount).ToString("N0") : "0") <small>ج.م</small></span>
+                        </div>
+                    </div>
+
+                    <!-- Details Grid -->
                     <div class="card-details-grid">
                         <div class="detail-item">
+                            <span class="detail-icon">🌐</span>
                             <span class="detail-label">رابط السيرفر (API URL):</span>
-                            <span class="detail-val api-url" title="@branch.ApiUrl">@branch.ApiUrl</span>
+                            <span class="detail-val api-url" dir="ltr" title="@branch.ApiUrl">@branch.ApiUrl</span>
                         </div>
                         <div class="detail-item">
+                            <span class="detail-icon">🏭</span>
                             <span class="detail-label">المخزن الرئيسي المورد:</span>
                             <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.LinkedWarehouseName) ? "غير محدد" : branch.LinkedWarehouseName)</span>
                         </div>
                         <div class="detail-item">
+                            <span class="detail-icon">👤</span>
                             <span class="detail-label">مدير الفرع:</span>
                             <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.ManagerName) ? "-" : branch.ManagerName)</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">مبيعات اليوم المسحوبة:</span>
-                            <span class="detail-val revenue-highlight">@branch.TodayRevenue.ToString("N0") ج.م (@branch.TodayOrdersCount طلب)</span>
                         </div>
                     </div>
 

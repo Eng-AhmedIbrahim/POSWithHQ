@@ -246,22 +246,39 @@
     margin-bottom: 12px;
     padding-bottom: 10px;
     border-bottom: 1px solid #f3e6c0;
+    flex-direction: row-reverse;
 }
 
-.code-and-title {
+/* Right side: name + city */
+.header-right {
+    flex: 1;
+    text-align: right;
+}
+
+/* Left side: code badge + status */
+.header-left {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.status-badges-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
 }
 
 .branch-code-badge {
-    padding: 4px 10px;
-    background: #fff6df;
+    padding: 4px 12px;
+    background: linear-gradient(135deg, #fff6df, #fef3c7);
     border: 1px solid #ead9a4;
     border-radius: 8px;
     color: #8a6a12;
     font-weight: 800;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
 }
 
 .branch-name {
@@ -269,29 +286,52 @@
     font-size: 1.1rem;
     font-weight: 800;
     color: #1c1408;
+    line-height: 1.3;
 }
 
 .branch-city {
     font-size: 0.78rem;
     color: #6b5420;
     display: block;
-    margin-top: 1px;
+    margin-top: 2px;
+    line-height: 1.4;
 }
 
 .status-indicator-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
+    gap: 5px;
+    padding: 3px 9px;
     border-radius: 20px;
-    font-size: 0.76rem;
+    font-size: 0.74rem;
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .status-indicator-badge .status-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-label-txt {
+    white-space: nowrap;
+}
+
+/* Latency pill */
+.latency-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    font-size: 0.7rem;
+    font-weight: 600;
+    direction: ltr;
+    white-space: nowrap;
 }
 
 .status-indicator-badge.status-online {
@@ -301,6 +341,7 @@
 }
 .status-indicator-badge.status-online .status-dot {
     background: #10b981;
+    box-shadow: 0 0 5px #10b981;
 }
 
 .status-indicator-badge.status-offline {
@@ -321,35 +362,117 @@
     background: #f59e0b;
 }
 
+/* Branch stats strip — 3 columns with dividers */
+.branch-stats-strip {
+    display: flex;
+    align-items: stretch;
+    background: #fbf7ee;
+    border: 1px solid #ead9a4;
+    border-radius: 12px;
+    padding: 0;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.strip-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    text-align: center;
+}
+
+.strip-divider {
+    width: 1px;
+    background: #ead9a4;
+    margin: 8px 0;
+}
+
+.strip-label {
+    font-size: 0.69rem;
+    color: #6b5420;
+    margin-bottom: 3px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.strip-val {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #1c1408;
+    white-space: nowrap;
+}
+
+.strip-val small {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #6b5420;
+}
+
+.strip-val.gold-val {
+    color: #8a6a12;
+}
+
+.strip-val.danger-val {
+    color: #b45309;
+}
+
 /* Card details list */
 .card-details-grid {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 6px;
     margin-bottom: 12px;
 }
 
 .detail-item {
     display: flex;
-    justify-content: space-between;
-    font-size: 0.84rem;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.83rem;
+    padding: 4px 6px;
+    border-radius: 6px;
+}
+
+.detail-item:nth-child(odd) {
+    background: #fbf7ee;
+}
+
+.detail-icon {
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
 }
 
 .detail-label {
     color: #8a6a12;
     font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .detail-val {
     color: #1c1408;
     font-weight: 700;
+    margin-right: auto;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .detail-val.api-url {
-    font-family: monospace;
-    font-size: 0.8rem;
-    color: #8a6a12;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.78rem;
+    color: #047857;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 5px;
+    padding: 1px 6px;
     direction: ltr;
+    max-width: 200px;
 }
 
 .detail-val.revenue-highlight {
@@ -377,13 +500,14 @@
 /* Card footer buttons */
 .card-footer-actions {
     display: flex;
-    gap: 8px;
+    gap: 7px;
+    flex-wrap: nowrap;
 }
 
 .footer-btn {
     flex: 1;
-    height: 34px;
-    border-radius: 9px;
+    height: 36px;
+    border-radius: 10px;
     border: 1px solid #ead9a4;
     background: #fff6df;
     color: #6b5420;
@@ -395,11 +519,16 @@
     font-weight: 700;
     cursor: pointer;
     transition: all 0.15s;
+    white-space: nowrap;
+    padding: 0 10px;
 }
 
 .footer-btn:hover {
     background: #fff0c7;
     color: #1c1408;
+    border-color: #c9a227;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(201,162,39,0.15);
 }
 
 .footer-btn.pull-btn {
@@ -409,16 +538,29 @@
 }
 .footer-btn.pull-btn:hover {
     background: #d1fae5;
+    color: #065f46;
+}
+
+.footer-btn.edit-btn {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0369a1;
+}
+.footer-btn.edit-btn:hover {
+    background: #bae6fd;
+    color: #075985;
 }
 
 .footer-btn.delete-btn {
-    flex: 0 0 36px;
+    flex: 0 0 38px;
+    padding: 0;
     color: #b91c1c;
     border-color: #fecaca;
     background: #fef2f2;
 }
 .footer-btn.delete-btn:hover {
     background: #fee2e2;
+    color: #991b1b;
 }
 
 /* ── Modal Dialog Styles ── */

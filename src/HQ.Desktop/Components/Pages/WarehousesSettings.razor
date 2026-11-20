@@ -100,52 +100,61 @@
             @foreach (var wh in FilteredWarehouses)
             {
                 <div class="warehouse-card @(wh.IsActive ? "" : "disabled-card")">
+                    <!-- Card Header Row -->
                     <div class="card-top-header">
-                        <div class="code-and-title">
+                        <div class="header-left">
                             <span class="wh-code-badge">@wh.Code</span>
-                            <div>
-                                <h3 class="wh-name">@wh.Name</h3>
-                                <span class="wh-city">@wh.City @(string.IsNullOrWhiteSpace(wh.Address) ? "" : $"· {wh.Address}")</span>
+                            <div class="status-badges-row">
+                                <div class="status-indicator-badge @GetStatusClass(wh.Status)">
+                                    <span class="status-dot"></span>
+                                    <span class="status-label-txt">@GetStatusLabel(wh.Status)</span>
+                                </div>
+                                @if (wh.PingLatencyMs.HasValue && wh.Status == HqSyncStatus.Online)
+                                {
+                                    <span class="latency-pill" dir="ltr">@wh.PingLatencyMs ms</span>
+                                }
                             </div>
                         </div>
-                        <div class="status-indicator-badge @GetStatusClass(wh.Status)">
-                            <span class="status-dot"></span>
-                            <span>@GetStatusLabel(wh.Status)</span>
-                            @if (wh.PingLatencyMs.HasValue && wh.Status == HqSyncStatus.Online)
-                            {
-                                <small>(@wh.PingLatencyMs ms)</small>
-                            }
+                        <div class="header-right">
+                            <h3 class="wh-name">@wh.Name</h3>
+                            <span class="wh-city">@wh.City @(string.IsNullOrWhiteSpace(wh.Address) ? "" : $"· {wh.Address}")</span>
                         </div>
                     </div>
 
-                    <!-- Warehouse Metric Stats Strip -->
+                    <!-- Stats Strip (3 columns) -->
                     <div class="wh-stats-strip">
                         <div class="strip-item">
                             <span class="strip-label">تقييم المخزون</span>
                             <span class="strip-val gold-val">@wh.StockValuation.ToString("N0") ج.م</span>
                         </div>
+                        <div class="strip-divider"></div>
                         <div class="strip-item">
                             <span class="strip-label">الأصناف المتاحة</span>
-                            <span class="strip-val">@wh.StockItemsCount صنف</span>
+                            <span class="strip-val">@wh.StockItemsCount <small>صنف</small></span>
                         </div>
+                        <div class="strip-divider"></div>
                         <div class="strip-item">
                             <span class="strip-label">أصناف قاربت على النفاد</span>
-                            <span class="strip-val danger-val">@wh.LowStockItemsCount أصناف</span>
+                            <span class="strip-val danger-val">@wh.LowStockItemsCount <small>أصناف</small></span>
                         </div>
                     </div>
 
+                    <!-- Details Grid -->
                     <div class="card-details-grid">
                         <div class="detail-item">
+                            <span class="detail-icon">🌐</span>
                             <span class="detail-label">رابط السيرفر (API URL):</span>
-                            <span class="detail-val api-url" title="@wh.ApiUrl">@wh.ApiUrl</span>
+                            <span class="detail-val api-url" dir="ltr" title="@wh.ApiUrl">@wh.ApiUrl</span>
                         </div>
                         <div class="detail-item">
+                            <span class="detail-icon">👤</span>
                             <span class="detail-label">مدير المخزن الرئيسي:</span>
                             <span class="detail-val">@(string.IsNullOrWhiteSpace(wh.ManagerName) ? "-" : wh.ManagerName)</span>
                         </div>
                         <div class="detail-item">
+                            <span class="detail-icon">📞</span>
                             <span class="detail-label">رقم الهاتف:</span>
-                            <span class="detail-val">@(string.IsNullOrWhiteSpace(wh.Phone) ? "-" : wh.Phone)</span>
+                            <span class="detail-val" dir="ltr">@(string.IsNullOrWhiteSpace(wh.Phone) ? "-" : wh.Phone)</span>
                         </div>
                     </div>
 

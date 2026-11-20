@@ -122,8 +122,10 @@
     font-weight: 600;
     font-size: 0.95rem;
     white-space: nowrap;
-    transition: background 0.18s, color 0.18s;
+    transition: background 0.18s, color 0.18s, transform 0.18s;
     text-decoration: none;
+    width: 100%;
+    text-align: right;
 }
 
 .nav-link i, .foot-btn i {
@@ -133,8 +135,9 @@
 
 .nav-link:hover,
 .foot-btn:hover {
-    background: rgba(212, 160, 23, 0.1);
-    color: #f0d060;
+    background: rgba(212, 160, 23, 0.18);
+    color: #ffd700;
+    transform: translateX(-3px);
 }
 
 .nav-link.active {

@@ -2,6 +2,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ISnackbar Snackbar
 @using HQ.Desktop.Auth
+@implements IDisposable
 
 <aside class="side-nav @(_open ? "is-open" : "is-collapsed")" dir="rtl">
     <div class="side-top">
@@ -18,22 +19,22 @@
     </div>
 
     <nav class="side-links">
-        <button class="nav-link @(IsActive("/") ? "active" : "")" title="لوحة المقارنات المركزية" @onclick='() => Navigation.NavigateTo("/")'>
+        <button class="nav-link @(IsActive("/") ? "active" : "")" title="لوحة المقارنات المركزية" @onclick='() => NavigateTo("/")'>
             <MudIcon Icon="@Icons.Material.Rounded.Dashboard" />
             <span>لوحة المقارنات والمتابعة</span>
         </button>
 
-        <button class="nav-link @(IsActive("/branches-settings") ? "active" : "")" title="إعدادات الفروع وسحب الداتا" @onclick='() => Navigation.NavigateTo("/branches-settings")'>
+        <button class="nav-link @(IsActive("/branches-settings") ? "active" : "")" title="إعدادات الفروع وسحب الداتا" @onclick='() => NavigateTo("/branches-settings")'>
             <MudIcon Icon="@Icons.Material.Rounded.Storefront" />
             <span>إعدادات الفروع</span>
         </button>
 
-        <button class="nav-link @(IsActive("/warehouses-settings") ? "active" : "")" title="إعدادات المخازن الرئيسية" @onclick='() => Navigation.NavigateTo("/warehouses-settings")'>
+        <button class="nav-link @(IsActive("/warehouses-settings") ? "active" : "")" title="إعدادات المخازن الرئيسية" @onclick='() => NavigateTo("/warehouses-settings")'>
             <MudIcon Icon="@Icons.Material.Rounded.Warehouse" />
             <span>المخازن الرئيسية</span>
         </button>
 
-        <button class="nav-link @(IsActive("/settings") ? "active" : "")" title="إعدادات المقر العامة" @onclick='() => Navigation.NavigateTo("/settings")'>
+        <button class="nav-link @(IsActive("/settings") ? "active" : "")" title="إعدادات المقر العامة" @onclick='() => NavigateTo("/settings")'>
             <MudIcon Icon="@Icons.Material.Rounded.Settings" />
             <span>إعدادات المقر</span>
         </button>
@@ -62,17 +63,30 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Navigation.LocationChanged += OnLocationChanged;
         var state = await AuthStateProvider.GetAuthenticationStateAsync();
         _userName = state.User.Identity?.Name ?? "مدير المقر";
         _initials = _userName.Length >= 2 ? _userName[..2] : "HQ";
     }
 
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void NavigateTo(string path)
+    {
+        Navigation.NavigateTo(path);
+        StateHasChanged();
+    }
+
     private bool IsActive(string path)
     {
-        var uri = Navigation.ToBaseRelativePath(Navigation.Uri);
-        if (string.IsNullOrEmpty(uri))
-            return path == "/";
-        return ("/" + uri).Equals(path, StringComparison.OrdinalIgnoreCase);
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var cleanRel = string.IsNullOrEmpty(relative) ? "/" : ("/" + relative.Split('?')[0].TrimEnd('/'));
+        var cleanPath = path.TrimEnd('/');
+        if (string.IsNullOrEmpty(cleanPath)) cleanPath = "/";
+        return cleanRel.Equals(cleanPath, StringComparison.OrdinalIgnoreCase);
     }
 
     private void Toggle() => _open = !_open;
@@ -86,4 +100,9 @@
     }
 
     private static void ExitApp() => System.Windows.Application.Current.Shutdown();
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
 }

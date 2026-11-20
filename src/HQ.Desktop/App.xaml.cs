@@ -4,10 +4,12 @@ using System.Windows;
 using HQ.Desktop.Auth;
 using HQ.Desktop.Services;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
 using MudBlazor.Services;
+using Pos.Repository.Data;
 
 namespace HQ.Desktop;
 
@@ -46,6 +48,12 @@ public partial class App : Application
         services.AddWpfBlazorWebView();
         services.AddBlazorWebViewDeveloperTools();
         services.AddAuthorizationCore();
+
+        // Database Context Configuration
+        var connectionString = configuration.GetConnectionString("DefaultConnection") 
+            ?? "Server=.\\SQLEXPRESS;Database=PointOfSaleDBk;User Id=sa;Password=NewTechn0;TrustServerCertificate=true";
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseSqlServer(connectionString), ServiceLifetime.Transient);
 
         services.AddMudServices(config =>
         {
