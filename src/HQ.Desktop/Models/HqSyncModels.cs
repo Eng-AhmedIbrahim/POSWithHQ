@@ -224,3 +224,70 @@ public sealed class HqSyncMetricsReport
     public decimal TotalVoidValueSynced { get; set; }
     public DateTime LastSyncTimestamp { get; set; } = DateTime.Now;
 }
+
+public sealed class HqVoidAuditEntry
+{
+    public int OrderId { get; set; }
+    public int BranchId { get; set; }
+    public string BranchName { get; set; } = string.Empty;
+    public string Scope { get; set; } = "فاتورة كاملة"; // "فاتورة كاملة" or "صنف فردي"
+    public string ItemName { get; set; } = "كامل الفاتورة";
+    public decimal Quantity { get; set; } = 1;
+    public decimal Amount { get; set; }
+    public string VoidByName { get; set; } = string.Empty;
+    public string VoidReason { get; set; } = string.Empty;
+    public DateTime VoidTime { get; set; }
+    public string TableOrCustomer { get; set; } = string.Empty;
+}
+
+public sealed class HqWarehouseStockItemDto
+{
+    public int ProductId { get; set; }
+    public string SKU { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = string.Empty;
+    public string UnitName { get; set; } = "كجم";
+    public decimal QuantityOnHand { get; set; }
+    public decimal WeightedAverageCost { get; set; }
+    public decimal TotalValuation => QuantityOnHand * WeightedAverageCost;
+    public decimal MinStockLevel { get; set; }
+    public string Status => QuantityOnHand <= 0 ? "نفد" : (QuantityOnHand <= MinStockLevel ? "منخفض" : "متوفر");
+}
+
+public sealed class HqRequisitionDetailDto
+{
+    public int RequisitionId { get; set; }
+    public string RequisitionNumber { get; set; } = string.Empty;
+    public int BranchId { get; set; }
+    public string BranchName { get; set; } = string.Empty;
+    public string TargetWarehouseName { get; set; } = "المخزن الرئيسي المركزي";
+    public DateTime RequestedDate { get; set; }
+    public string Status { get; set; } = "قيد المراجعة";
+    public decimal EstimatedTotal { get; set; }
+    public List<HqRequisitionLineDto> Lines { get; set; } = new();
+}
+
+public sealed class HqRequisitionLineDto
+{
+    public string ProductName { get; set; } = string.Empty;
+    public string UnitName { get; set; } = "قطعة";
+    public decimal RequestedQty { get; set; }
+    public decimal ApprovedQty { get; set; }
+    public decimal DispatchedQty { get; set; }
+    public decimal UnitCost { get; set; }
+    public decimal LineTotal => RequestedQty * UnitCost;
+}
+
+public sealed class HqStockMovementDto
+{
+    public int Id { get; set; }
+    public string WarehouseName { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string MovementType { get; set; } = "توريد مورد"; // "توريد مورد", "صرف لفرع", "هالك وتالف", "تسوية جردية"
+    public decimal Quantity { get; set; }
+    public string UnitName { get; set; } = "كجم";
+    public decimal UnitCost { get; set; }
+    public decimal TotalCost => Quantity * UnitCost;
+    public DateTime MovementDate { get; set; }
+    public string ReferenceNumber { get; set; } = string.Empty;
+}

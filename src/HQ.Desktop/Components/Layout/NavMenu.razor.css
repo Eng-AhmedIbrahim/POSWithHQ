@@ -17,6 +17,8 @@
     transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     flex-shrink: 0;
+    position: relative;
+    z-index: 1000;
 }
 
 .side-nav.is-open    { width: 272px; }
@@ -115,17 +117,24 @@
     align-items: center;
     gap: 12px;
     padding: 0 14px;
-    color: rgba(240, 208, 96, 0.72);
+    color: rgba(240, 208, 96, 0.75);
     background: transparent;
     cursor: pointer;
     font-family: inherit;
     font-weight: 600;
     font-size: 0.95rem;
     white-space: nowrap;
-    transition: background 0.18s, color 0.18s, transform 0.18s;
+    transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
     text-decoration: none;
     width: 100%;
     text-align: right;
+    position: relative;
+    user-select: none;
+}
+
+.nav-link > *,
+.foot-btn > * {
+    pointer-events: none;
 }
 
 .nav-link i, .foot-btn i {
@@ -135,20 +144,36 @@
 
 .nav-link:hover,
 .foot-btn:hover {
-    background: rgba(212, 160, 23, 0.18);
-    color: #ffd700;
-    transform: translateX(-3px);
+    background: rgba(240, 208, 96, 0.22) !important;
+    color: #ffffff !important;
+    transform: translateX(-4px);
+    box-shadow: 0 4px 16px rgba(212, 160, 23, 0.3) !important;
+    border-right: 3px solid #f0cc50 !important;
+}
+
+.nav-link:focus,
+.foot-btn:focus {
+    outline: none !important;
+}
+
+.nav-link:focus-visible,
+.foot-btn:focus-visible {
+    outline: 2px solid #ffd700 !important;
+    outline-offset: -2px;
 }
 
 .nav-link.active {
-    color: #1c1200;
-    background: linear-gradient(135deg, #f0cc50, #c9a227 55%, #a07a10);
-    box-shadow: 0 8px 22px rgba(201, 162, 39, 0.3),
-                inset 0 1px 0 rgba(255, 249, 220, 0.3);
-    font-weight: 800;
+    color: #1c1200 !important;
+    background: linear-gradient(135deg, #f0cc50, #c9a227 55%, #a07a10) !important;
+    box-shadow: 0 8px 22px rgba(201, 162, 39, 0.4),
+                inset 0 1px 0 rgba(255, 249, 220, 0.4) !important;
+    font-weight: 800 !important;
+    border-right: 3px solid #ffffff !important;
 }
 
-.nav-link.active i { color: #1c1200; }
+.nav-link.active * {
+    color: #1c1200 !important;
+}
 
 /* ─── Footer ───────────────────────────── */
 .side-foot {

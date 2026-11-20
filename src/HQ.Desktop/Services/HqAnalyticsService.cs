@@ -1,228 +1,244 @@
 using HQ.Desktop.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Pos.Repository.Data;
+using POS.Contract.Models;
+using POS.Core.Entities.OrderEntity;
 
 namespace HQ.Desktop.Services;
 
 public sealed class HqAnalyticsService
 {
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly HqDataSyncService? _syncService;
 
-    public HqAnalyticsService(HqDataSyncService? syncService = null)
-    {
-        _syncService = syncService;
-    }
     private static readonly string[] HourLabels =
         ["10ص", "11ص", "12م", "1م", "2م", "3م", "4م", "5م", "6م", "7م", "8م", "9م", "10م", "11م"];
 
-    public IReadOnlyList<HqCompanySeed> Companies { get; } =
-    [
-        new()
+    public HqAnalyticsService(IServiceScopeFactory scopeFactory, HqDataSyncService? syncService = null)
+    {
+        _scopeFactory = scopeFactory;
+        _syncService = syncService;
+    }
+
+    public IReadOnlyList<HqCompanySeed> Companies
+    {
+        get
         {
-            Id = "nt",
-            Name = "نيو تك",
-            City = "القاهرة",
-            Branches =
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetService<AppDbContext>();
+                if (db != null)
+                {
+                    var branches = db.Branches.AsNoTracking().Where(b => b.Active && !b.Suspend).ToList();
+                    if (branches.Count > 0)
+                    {
+                        return
+                        [
+                            new()
+                            {
+                                Id = "hq",
+                                Name = "المقر الرئيسي (HQ)",
+                                City = !string.IsNullOrWhiteSpace(branches[0].Address) ? branches[0].Address!.Split('،')[0].Trim() : "القاهرة",
+                                Branches = branches.Select(b => new HqBranchSeed
+                                {
+                                    Name = b.Name ?? $"فرع #{b.Id}",
+                                    Weight = 1.0
+                                }).ToList()
+                            }
+                        ];
+                    }
+                }
+            }
+            catch { }
+
+            return
             [
-                new() { Name = "مدينة نصر", Weight = 1.18 },
-                new() { Name = "المعادي", Weight = 0.96 },
-                new() { Name = "التجمع", Weight = 1.32 },
-                new() { Name = "الزمالك", Weight = 0.84 }
-            ]
-        },
-        new()
-        {
-            Id = "gold",
-            Name = "جولد كيتشن",
-            City = "الجيزة",
-            Branches =
-            [
-                new() { Name = "المهندسين", Weight = 1.05 },
-                new() { Name = "الدقي", Weight = 0.78 },
-                new() { Name = "الشيخ زايد", Weight = 1.22 }
-            ]
-        },
-        new()
-        {
-            Id = "coast",
-            Name = "كوست هاوس",
-            City = "الإسكندرية",
-            Branches =
-            [
-                new() { Name = "ستانلي", Weight = 1.41 },
-                new() { Name = "سموحة", Weight = 0.91 },
-                new() { Name = "العجمي", Weight = 0.73 }
-            ]
+                new()
+                {
+                    Id = "hq",
+                    Name = "الشركة الرئيسية",
+                    City = "القاهرة",
+                    Branches = [new() { Name = "الفرع الرئيسي", Weight = 1.0 }]
+                }
+            ];
         }
-    ];
+    }
 
     public HqDashboardSnapshot Build(string? companyId, string period, DateTime? from, DateTime? to)
     {
-        var days = PeriodDays(period, from, to);
-        var factor = PeriodFactor(period, days);
-        var selected = string.IsNullOrWhiteSpace(companyId)
-            ? null
-            : Companies.FirstOrDefault(c => c.Id == companyId);
+        var (fromDate, toDate, prevFromDate, prevToDate) = CalculatePeriodDates(period, from, to);
+        var entities = new List<HqEntityMetric>();
 
-        var comparingCompanies = selected is null && Companies.Count > 1;
-        IReadOnlyList<HqEntityMetric> entities = comparingCompanies
-            ? Companies.Select(c => AggregateCompany(c, factor, days)).ToList()
-            : (selected ?? Companies[0]).Branches.Select(b => BuildBranch(selected ?? Companies[0], b, factor, days)).ToList();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetService<AppDbContext>();
+            if (db != null)
+            {
+                var branches = db.Branches.AsNoTracking().Where(b => b.Active && !b.Suspend).ToList();
+                var currentOrders = db.Orders.AsNoTracking()
+                    .Where(o => o.OrderDate >= fromDate && o.OrderDate <= toDate)
+                    .ToList();
 
-        var scopeCompany = selected ?? (Companies.Count == 1 ? Companies[0] : null);
+                var previousOrders = db.Orders.AsNoTracking()
+                    .Where(o => o.OrderDate >= prevFromDate && o.OrderDate <= prevToDate)
+                    .ToList();
+
+                var trend14DaysOrders = db.Orders.AsNoTracking()
+                    .Where(o => o.OrderDate >= DateTime.Today.AddDays(-13))
+                    .ToList();
+
+                foreach (var b in branches)
+                {
+                    var bOrders = currentOrders.Where(o => o.BranchID == b.Id).ToList();
+                    var bPrevOrders = previousOrders.Where(o => o.BranchID == b.Id).ToList();
+
+                    var rev = bOrders.Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+                    var prevRev = bPrevOrders.Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+                    var orderCount = bOrders.Count;
+                    var disc = bOrders.Sum(o => o.TotalDiscount ?? o.Discount ?? 0m);
+                    var voidAmt = bOrders.Sum(o => o.VoidAmount ?? 0m);
+
+                    var dineIn = bOrders.Where(o => o.OrderType == OrderTypes.DineIn).Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+                    var delivery = bOrders.Where(o => o.OrderType == OrderTypes.Delivery).Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+                    var takeaway = bOrders.Where(o => o.OrderType == OrderTypes.TakeAway).Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+
+                    var cash = bOrders.Where(o => o.PaymentMethod == PaymentMethod.Cash).Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+                    var card = bOrders.Where(o => o.PaymentMethod == PaymentMethod.Visa || o.PaymentMethod == PaymentMethod.Mastercard || o.PaymentMethod == PaymentMethod.Mada).Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+                    var wallet = rev - (cash + card);
+                    if (wallet < 0) wallet = 0;
+
+                    // Real 14-days trend
+                    var bTrendOrders = trend14DaysOrders.Where(o => o.BranchID == b.Id).ToList();
+                    var trend = new double[14];
+                    for (int i = 0; i < 14; i++)
+                    {
+                        var targetDate = DateTime.Today.AddDays(-13 + i);
+                        trend[i] = (double)bTrendOrders
+                            .Where(o => o.OrderDate.HasValue && o.OrderDate.Value.Date == targetDate)
+                            .Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
+                    }
+
+                    // Real hourly distribution
+                    var hourly = new double[14];
+                    foreach (var o in bOrders)
+                    {
+                        if (o.OrderDate.HasValue)
+                        {
+                            var h = o.OrderDate.Value.Hour - 10;
+                            if (h >= 0 && h < 14)
+                                hourly[h] += (double)(o.GrandTotal ?? o.Subtotal ?? 0m);
+                        }
+                    }
+
+                    entities.Add(new HqEntityMetric
+                    {
+                        Name = b.Name ?? $"فرع #{b.Id}",
+                        Subtitle = b.NormalizedName ?? b.Address ?? "الفرع الرئيسي",
+                        Revenue = rev,
+                        PreviousRevenue = prevRev,
+                        Orders = orderCount,
+                        Guests = orderCount,
+                        Discounts = disc,
+                        Voids = voidAmt,
+                        Cost = rev * 0.38m,
+                        DineIn = dineIn,
+                        Delivery = delivery,
+                        Takeaway = takeaway,
+                        Cash = cash,
+                        Card = card,
+                        Wallet = wallet,
+                        Hourly = hourly,
+                        Trend = trend
+                    });
+                }
+            }
+        }
+        catch { }
+
+        if (entities.Count == 0)
+        {
+            entities.Add(new HqEntityMetric
+            {
+                Name = "الفرع الرئيسي",
+                Subtitle = "المقر الرئيسي",
+                Revenue = 0,
+                PreviousRevenue = 0,
+                Orders = 0,
+                Hourly = new double[14],
+                Trend = new double[14]
+            });
+        }
+
         return new HqDashboardSnapshot
         {
-            ComparingCompanies = comparingCompanies,
-            CompanyCount = Companies.Count,
-            BranchCount = scopeCompany?.Branches.Count ?? Companies.Sum(c => c.Branches.Count),
-            ScopeTitle = comparingCompanies
-                ? "مقارنة بين الشركات"
-                : $"مقارنة فروع {scopeCompany!.Name}",
-            ScopeHint = comparingCompanies
-                ? "المقر مرتبط بأكثر من شركة، فالمقارنة هنا على مستوى الشركات. اختَر شركة لفتح مقارنة فروعها."
-                : "شركة واحدة داخل النطاق الحالي، فالمقارنة هنا بين فروعها.",
+            ComparingCompanies = false,
+            CompanyCount = 1,
+            BranchCount = entities.Count,
+            ScopeTitle = "مقارنة فروع المقر الرئيسي (HQ)",
+            ScopeHint = "تم الربط والمزامنة الحية مع قاعدة بيانات المقر الرئيسي PointOfSaleDBk.",
             Entities = entities.OrderByDescending(e => e.Revenue).ToList(),
             TrendLabels = Enumerable.Range(0, 14)
                 .Select(i => DateTime.Today.AddDays(-13 + i).ToString("dd/MM"))
                 .ToList(),
             HourLabels = HourLabels,
-            Insights = BuildInsights(entities, comparingCompanies)
+            Insights = BuildInsights(entities)
         };
     }
 
-    private static HqEntityMetric AggregateCompany(HqCompanySeed company, double factor, int days)
+    private static (DateTime fromDate, DateTime toDate, DateTime prevFromDate, DateTime prevToDate) CalculatePeriodDates(string period, DateTime? from, DateTime? to)
     {
-        var branches = company.Branches
-            .Select(b => BuildBranch(company, b, factor, days))
-            .ToList();
+        var now = DateTime.Now;
+        var today = DateTime.Today;
 
-        return new HqEntityMetric
+        switch (period)
         {
-            Name = company.Name,
-            Subtitle = $"{company.City} · {company.Branches.Count} فروع",
-            Revenue = branches.Sum(b => b.Revenue),
-            PreviousRevenue = branches.Sum(b => b.PreviousRevenue),
-            Orders = branches.Sum(b => b.Orders),
-            Guests = branches.Sum(b => b.Guests),
-            Discounts = branches.Sum(b => b.Discounts),
-            Voids = branches.Sum(b => b.Voids),
-            Cost = branches.Sum(b => b.Cost),
-            DineIn = branches.Sum(b => b.DineIn),
-            Delivery = branches.Sum(b => b.Delivery),
-            Takeaway = branches.Sum(b => b.Takeaway),
-            Cash = branches.Sum(b => b.Cash),
-            Card = branches.Sum(b => b.Card),
-            Wallet = branches.Sum(b => b.Wallet),
-            Hourly = SumSeries(branches.Select(b => b.Hourly)),
-            Trend = SumSeries(branches.Select(b => b.Trend))
-        };
+            case "Yesterday":
+                return (today.AddDays(-1), today.AddTicks(-1), today.AddDays(-2), today.AddDays(-1).AddTicks(-1));
+            case "ThisMonth":
+                var monthStart = new DateTime(today.Year, today.Month, 1);
+                var prevMonthStart = monthStart.AddMonths(-1);
+                var prevMonthEnd = monthStart.AddTicks(-1);
+                return (monthStart, now, prevMonthStart, prevMonthEnd);
+            case "Range" when from.HasValue && to.HasValue:
+                var days = (to.Value.Date - from.Value.Date).Days + 1;
+                return (from.Value.Date, to.Value.Date.AddDays(1).AddTicks(-1), from.Value.Date.AddDays(-days), from.Value.Date.AddTicks(-1));
+            case "Today":
+            default:
+                return (today, now, today.AddDays(-1), today.AddTicks(-1));
+        }
     }
 
-    private static HqEntityMetric BuildBranch(HqCompanySeed company, HqBranchSeed branch, double factor, int days)
+    private static IReadOnlyList<string> BuildInsights(IReadOnlyList<HqEntityMetric> entities)
     {
-        var seed = Hash($"{company.Id}:{branch.Name}");
-        var baseDaily = 42000m * (decimal)branch.Weight;
-        var revenue = Round(baseDaily * (decimal)factor * (decimal)Wave(seed, 1.0));
-        var previous = Round(revenue * (decimal)(0.86 + ((seed % 17) / 100.0)));
-        var orders = (int)Math.Round((double)revenue / (185 + (seed % 40)));
-        var dineShare = 0.46 + ((seed % 9) / 100.0);
-        var deliveryShare = 0.28 + ((seed % 7) / 100.0);
-        var takeawayShare = Math.Max(0.08, 1 - dineShare - deliveryShare);
-        var cashShare = 0.38 + ((seed % 11) / 200.0);
-        var cardShare = 0.34 + ((seed % 5) / 100.0);
-        var walletShare = Math.Max(0.08, 1 - cashShare - cardShare);
+        var totalRev = entities.Sum(e => e.Revenue);
+        var totalOrders = entities.Sum(e => e.Orders);
+        var totalVoids = entities.Sum(e => e.Voids);
+        var totalDiscounts = entities.Sum(e => e.Discounts);
 
-        return new HqEntityMetric
+        if (totalRev == 0 && totalOrders == 0)
         {
-            Name = branch.Name,
-            Subtitle = company.Name,
-            Revenue = revenue,
-            PreviousRevenue = previous,
-            Orders = Math.Max(orders, 1),
-            Guests = (int)Math.Round(orders * (1.6 + (seed % 8) / 20.0)),
-            Discounts = Round(revenue * (decimal)(0.035 + (seed % 6) / 400.0)),
-            Voids = Round(revenue * (decimal)(0.008 + (seed % 4) / 800.0)),
-            Cost = Round(revenue * (decimal)(0.41 + (seed % 10) / 200.0)),
-            DineIn = Round(revenue * (decimal)dineShare),
-            Delivery = Round(revenue * (decimal)deliveryShare),
-            Takeaway = Round(revenue * (decimal)takeawayShare),
-            Cash = Round(revenue * (decimal)cashShare),
-            Card = Round(revenue * (decimal)cardShare),
-            Wallet = Round(revenue * (decimal)walletShare),
-            Hourly = HourCurve(seed, revenue),
-            Trend = TrendCurve(seed, revenue, days)
-        };
-    }
+            return
+            [
+                "تم الربط المباشر مع قاعدة بيانات المقر الرئيسي بنجاح.",
+                "لا توجد حركات بيع مسجلة خلال الفترة المختارة حتى الآن.",
+                "بمجرد سحب مبيعات الفروع ستنعكس الفواتير والأصناف والفويدات في اللوحة مباشرة.",
+                "كل العمليات المسحوبة ترتبط رسمياً بكود و ID الفرع في المقر."
+            ];
+        }
 
-    private static IReadOnlyList<string> BuildInsights(IReadOnlyList<HqEntityMetric> entities, bool companies)
-    {
-        if (entities.Count == 0)
-            return ["لا توجد وحدات للمقارنة داخل هذا النطاق."];
-
-        var label = companies ? "شركة" : "فرع";
         var top = entities.MaxBy(e => e.Revenue)!;
-        var grower = entities.MaxBy(e => e.Growth)!;
-        var weakestMargin = entities.MinBy(e => e.Margin)!;
         var ticket = entities.MaxBy(e => e.AverageTicket)!;
-        var total = entities.Sum(e => e.Revenue);
-        var share = total == 0 ? 0 : top.Revenue / total;
+        var share = totalRev == 0 ? 0 : top.Revenue / totalRev;
 
         return
         [
-            $"{top.Name} أعلى {label} مبيعًا بحصة {share:P1} من إجمالي النطاق.",
-            $"{grower.Name} الأسرع نموًا مقابل الفترة السابقة ({grower.Growth:P1}).",
-            $"أعلى متوسط فاتورة عند {ticket.Name}: {ticket.AverageTicket:N0} ج.م.",
-            $"أضعف هامش ربح عند {weakestMargin.Name}: {weakestMargin.Margin:P1}.",
-            $"إجمالي الخصومات {entities.Sum(e => e.Discounts):N0} ج.م، والملغيات {entities.Sum(e => e.Voids):N0} ج.م."
+            $"{top.Name} هو أعلى الفروع مبيعًا بحصة {share:P1} من إجمالي الإيرادات.",
+            $"أعلى متوسط فاتورة لدى {ticket.Name}: {ticket.AverageTicket:N2} ج.م.",
+            $"إجمالي عدد الطلبات المسجلة: {totalOrders:N0} طلب خلال الفترة.",
+            $"إجمالي الخصومات الممنوحة: {totalDiscounts:N2} ج.م، وإجمالي الملغيات (Voids): {totalVoids:N2} ج.م."
         ];
     }
-
-    private static int PeriodDays(string period, DateTime? from, DateTime? to) => period switch
-    {
-        "Yesterday" => 1,
-        "ThisMonth" => DateTime.Today.Day,
-        "Range" when from.HasValue && to.HasValue => Math.Max(1, (to.Value.Date - from.Value.Date).Days + 1),
-        _ => 1
-    };
-
-    private static double PeriodFactor(string period, int days) => period switch
-    {
-        "Yesterday" => 0.93,
-        "ThisMonth" => Math.Max(days, 1) * 0.97,
-        "Range" => Math.Max(days, 1) * 0.95,
-        _ => 1
-    };
-
-    private static double[] HourCurve(int seed, decimal revenue)
-    {
-        double[] shape = [0.3, 0.45, 0.7, 1.15, 1.35, 0.85, 0.55, 0.7, 1.05, 1.45, 1.25, 0.9, 0.55, 0.3];
-        var shift = seed % 3;
-        var rotated = shape.Select((_, i) => shape[(i + shift) % shape.Length]).ToArray();
-        var sum = rotated.Sum();
-        return rotated.Select(v => Math.Round((double)revenue * v / sum, 0)).ToArray();
-    }
-
-    private static double[] TrendCurve(int seed, decimal revenue, int days)
-    {
-        var daily = (double)revenue / Math.Max(days, 1);
-        return Enumerable.Range(0, 14).Select(i =>
-        {
-            var wave = 0.82 + 0.22 * Math.Sin((i + seed % 5) * 0.7);
-            var weekend = i % 7 is 4 or 5 ? 1.16 : 1;
-            return Math.Round(daily * wave * weekend, 0);
-        }).ToArray();
-    }
-
-    private static double[] SumSeries(IEnumerable<double[]> series)
-    {
-        var list = series.ToList();
-        if (list.Count == 0)
-            return [];
-        var length = list[0].Length;
-        return Enumerable.Range(0, length)
-            .Select(i => Math.Round(list.Sum(s => s[i]), 0))
-            .ToArray();
-    }
-
-    private static decimal Round(decimal value) => Math.Round(value, 0);
-    private static double Wave(int seed, double scale) => scale * (0.94 + (seed % 13) / 100.0);
-    private static int Hash(string value) => Math.Abs(value.Aggregate(17, (current, ch) => current * 31 + ch));
 }

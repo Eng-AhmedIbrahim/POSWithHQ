@@ -101,11 +101,11 @@ public sealed class HqDataSyncService
                                 IsActive = b.Active && !b.Suspend,
                                 Status = HqSyncStatus.Online,
                                 PingLatencyMs = 18,
-                                TodayRevenue = rev > 0 ? rev : 42800m,
-                                TodayOrdersCount = count > 0 ? count : 210,
-                                LastSyncAt = DateTime.Now.AddMinutes(-3),
-                                LinkedWarehouseName = "المخزن الرئيسي المركزي - القاهرة",
-                                LastSyncMessage = "متصل بقاعدة البيانات المحلية مباشرة"
+                                TodayRevenue = rev,
+                                TodayOrdersCount = count,
+                                LastSyncAt = count > 0 ? DateTime.Now : null,
+                                LinkedWarehouseName = "المخزن الرئيسي المركزي",
+                                LastSyncMessage = count > 0 ? $"تم السحب من قاعدة البيانات: {count} فاتورة" : "متصل بقاعدة البيانات مباشرة"
                             });
                         }
 
@@ -131,11 +131,11 @@ public sealed class HqDataSyncService
                                 IsActive = w.IsActive,
                                 Status = HqSyncStatus.Online,
                                 PingLatencyMs = 16,
-                                StockValuation = valuation > 0 ? valuation : 2480000m,
-                                StockItemsCount = itemsCount > 0 ? itemsCount : 480,
-                                LowStockItemsCount = lowCount > 0 ? lowCount : 5,
-                                LastSyncAt = DateTime.Now.AddMinutes(-2),
-                                LastSyncMessage = "متصل ومحدث من قاعدة البيانات"
+                                StockValuation = valuation,
+                                StockItemsCount = itemsCount,
+                                LowStockItemsCount = lowCount,
+                                LastSyncAt = itemsCount > 0 ? DateTime.Now : null,
+                                LastSyncMessage = itemsCount > 0 ? $"تم سحب {itemsCount} صنف من قاعدة البيانات" : "متصل بقاعدة البيانات مباشرة"
                             });
                         }
 
@@ -164,7 +164,22 @@ public sealed class HqDataSyncService
             catch { }
 
             _nodes.Clear();
-            _nodes.AddRange(GetDefaultNodesSeed());
+            _nodes.Add(new HqNodeConfig
+            {
+                Id = "1",
+                Code = "BR-01",
+                Name = "الفرع الرئيسي",
+                NodeType = HqNodeType.Branch,
+                City = "القاهرة",
+                Address = "المركز الرئيسي",
+                Phone = "01000000000",
+                ApiUrl = "http://100.79.100.86:5050",
+                IsActive = true,
+                Status = HqSyncStatus.Online,
+                TodayRevenue = 0,
+                TodayOrdersCount = 0,
+                LastSyncMessage = "جاهز لمزامنة البيانات"
+            });
             SaveNodesInternal();
         }
     }
@@ -413,7 +428,7 @@ public sealed class HqDataSyncService
 
             if (ordersCount > 0)
             {
-                branch.TodayRevenue = totalRevenue > 0 ? totalRevenue : branch.TodayRevenue;
+                branch.TodayRevenue = totalRevenue;
                 branch.TodayOrdersCount = ordersCount;
                 branch.PulledRecordsCount = ordersCount + itemsCount + attrCount + pnlCount + batchesCount + reqCount;
                 branch.LastSyncAt = DateTime.Now;
@@ -422,25 +437,12 @@ public sealed class HqDataSyncService
             }
             else
             {
-                // Fallback simulation for live demonstration if branch has 0 local DB entries yet
-                await Task.Delay(400, ct);
-                var random = new Random(branch.Code.GetHashCode() + DateTime.Today.Day);
-                var baseRev = branch.Code switch
-                {
-                    "BR-01" => 42800m,
-                    "BR-02" => 36500m,
-                    "BR-03" => 51200m,
-                    "BR-04" => 28400m,
-                    "BR-05" => 39100m,
-                    _ => 32000m
-                };
-                var variance = (decimal)(random.NextDouble() * 0.15 - 0.05);
-                branch.TodayRevenue = Math.Round(baseRev * (1 + variance), 0);
-                branch.TodayOrdersCount = (int)(branch.TodayRevenue / 185m);
-                branch.PulledRecordsCount = branch.TodayOrdersCount + 68;
+                branch.TodayRevenue = totalRevenue;
+                branch.TodayOrdersCount = ordersCount;
+                branch.PulledRecordsCount = pnlCount + batchesCount + reqCount;
                 branch.LastSyncAt = DateTime.Now;
-                branch.Status = HqSyncStatus.Online;
-                branch.LastSyncMessage = $"سحب ناجح ومربوط بـ HQ Branch #{branch.Id}: {branch.TodayOrdersCount} فاتورة وخصائصها، 14 قائمة دخل يومية P&L، 28 طبقة تكلفة مخزون، 9 طلبيات";
+                branch.Status = ping.Success ? HqSyncStatus.Online : HqSyncStatus.Online;
+                branch.LastSyncMessage = $"تم سحب البيانات من قاعدة البيانات وتحديث الربط بـ HQ #{hqBranchId}: {ordersCount} فاتورة اليوم، {pnlCount} قائمة دخل، {batchesCount} طبقة تكلفة، {reqCount} طلبية";
             }
 
             sw.Stop();
@@ -630,27 +632,33 @@ public sealed class HqDataSyncService
             var ping = await TestConnectionAsync(wh.ApiUrl, ct);
             wh.PingLatencyMs = ping.LatencyMs;
 
-            await Task.Delay(450, ct);
-
-            var random = new Random(wh.Code.GetHashCode() + DateTime.Today.Day);
-            wh.StockValuation = wh.Code switch
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetService<AppDbContext>();
+            if (db != null && int.TryParse(wh.Id, out int whId))
             {
-                "WH-MAIN-01" => 2480000m + random.Next(10000, 80000),
-                "WH-MAIN-02" => 1350000m + random.Next(5000, 40000),
-                _ => 980000m + random.Next(5000, 20000)
-            };
-            wh.StockItemsCount = random.Next(320, 580);
-            wh.LowStockItemsCount = random.Next(4, 16);
-            wh.PulledRecordsCount = wh.StockItemsCount + random.Next(12, 30);
+                var balances = await db.StockBalances.Where(sb => sb.WarehouseId == whId).ToListAsync(ct);
+                wh.StockValuation = balances.Sum(sb => sb.QuantityOnHand * sb.WeightedAverageCost);
+                wh.StockItemsCount = balances.Count(sb => sb.QuantityOnHand > 0);
+                wh.LowStockItemsCount = balances.Count(sb => sb.QuantityOnHand <= 5);
+                wh.PulledRecordsCount = balances.Count;
+            }
+            else
+            {
+                wh.StockValuation = 0;
+                wh.StockItemsCount = 0;
+                wh.LowStockItemsCount = 0;
+                wh.PulledRecordsCount = 0;
+            }
+
             wh.LastSyncAt = DateTime.Now;
             wh.Status = HqSyncStatus.Online;
-            wh.LastSyncMessage = $"تم سحب أرصدة {wh.StockItemsCount} صنف بقيمة {wh.StockValuation:N0} ج.م";
+            wh.LastSyncMessage = $"تم سحب وتدقيق أرصدة {wh.StockItemsCount} صنف بقيمة {wh.StockValuation:N2} ج.م من قاعدة البيانات";
 
             sw.Stop();
             log.Success = true;
             log.DurationMs = sw.ElapsedMilliseconds;
             log.RecordsCount = wh.PulledRecordsCount;
-            log.Message = $"تم تحديث المخزون: {wh.StockValuation:N0} ج.م ({wh.LowStockItemsCount} أصناف قاربت على النفاد)";
+            log.Message = $"تم تحديث أرصدة المخزن: {wh.StockValuation:N2} ج.م ({wh.LowStockItemsCount} أصناف قاربت على النفاد)";
         }
         catch (Exception ex)
         {
@@ -871,13 +879,12 @@ public sealed class HqDataSyncService
                     list.Add(dto);
                 }
 
-                if (list.Count > 0)
-                    return list;
+                return list;
             }
         }
         catch { }
 
-        return GetDemoAuditOrders();
+        return list;
     }
 
     public async Task<List<HqDailyPnLDto>> GetDailyPnLListAsync(int? branchId = null, DateTime? fromDate = null, DateTime? toDate = null)
@@ -923,12 +930,12 @@ public sealed class HqDataSyncService
                     });
                 }
 
-                if (list.Count > 0) return list;
+                return list;
             }
         }
         catch { }
 
-        return GetDemoDailyPnL();
+        return list;
     }
 
     public async Task<List<HqCostBatchDto>> GetCostBatchesAsync(int? branchId = null)
@@ -964,12 +971,237 @@ public sealed class HqDataSyncService
                     });
                 }
 
-                if (list.Count > 0) return list;
+                return list;
             }
         }
         catch { }
 
-        return GetDemoCostBatches();
+        return list;
+    }
+
+    public async Task<List<HqVoidAuditEntry>> GetVoidAuditListAsync(int? branchId = null, DateTime? fromDate = null, DateTime? toDate = null)
+    {
+        var list = new List<HqVoidAuditEntry>();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetService<AppDbContext>();
+            if (db != null)
+            {
+                var ordersQuery = db.Orders
+                    .Include(o => o.OrderDetails)
+                    .AsNoTracking();
+
+                if (branchId.HasValue && branchId.Value > 0)
+                    ordersQuery = ordersQuery.Where(o => o.BranchID == branchId.Value);
+
+                if (fromDate.HasValue)
+                    ordersQuery = ordersQuery.Where(o => o.OrderDate >= fromDate.Value.Date);
+
+                if (toDate.HasValue)
+                    ordersQuery = ordersQuery.Where(o => o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1));
+
+                var ordersWithVoids = await ordersQuery
+                    .Where(o => (o.VoidAmount ?? 0) > 0 || (o.OrderDetails != null && o.OrderDetails.Any(d => d.IsVoided == true)))
+                    .OrderByDescending(o => o.VoidTime ?? o.OrderDate)
+                    .Take(100)
+                    .ToListAsync();
+
+                foreach (var o in ordersWithVoids)
+                {
+                    // 1. Order-level full void
+                    if ((o.VoidAmount ?? 0) > 0)
+                    {
+                        list.Add(new HqVoidAuditEntry
+                        {
+                            OrderId = o.OrderID,
+                            BranchId = o.BranchID,
+                            BranchName = o.BranchName ?? $"فرع #{o.BranchID}",
+                            Scope = "فاتورة كاملة",
+                            ItemName = "كامل الفاتورة (طلب كامل)",
+                            Quantity = 1,
+                            Amount = o.VoidAmount ?? o.GrandTotal ?? 0m,
+                            VoidByName = o.VoidByName ?? o.VoidBy ?? "مدير الصالة",
+                            VoidReason = o.VoidReason ?? "إلغاء الطلب بالكامل",
+                            VoidTime = o.VoidTime ?? o.OrderDate ?? DateTime.Now,
+                            TableOrCustomer = !string.IsNullOrWhiteSpace(o.TableName) ? o.TableName : (o.CustomerName ?? "عميل")
+                        });
+                    }
+
+                    // 2. Item-level voids
+                    if (o.OrderDetails != null)
+                    {
+                        foreach (var d in o.OrderDetails.Where(x => x.IsVoided == true))
+                        {
+                            list.Add(new HqVoidAuditEntry
+                            {
+                                OrderId = o.OrderID,
+                                BranchId = o.BranchID,
+                                BranchName = o.BranchName ?? $"فرع #{o.BranchID}",
+                                Scope = "صنف فردي",
+                                ItemName = d.ItemNameAr ?? d.ItemName ?? "صنف غير مسمى",
+                                Quantity = d.VoidAmount ?? d.Quantity ?? 1m,
+                                Amount = d.TotalVoidAmount ?? d.TotalAmount ?? 0m,
+                                VoidByName = d.VoidByName ?? d.VoidBy ?? o.VoidByName ?? "مشرف الوردية",
+                                VoidReason = d.VoidReason ?? "إلغاء من قبل العميل بعد الطلب",
+                                VoidTime = d.VoidTime ?? o.VoidTime ?? o.OrderDate ?? DateTime.Now,
+                                TableOrCustomer = !string.IsNullOrWhiteSpace(o.TableName) ? o.TableName : (o.CustomerName ?? "عميل")
+                            });
+                        }
+                    }
+                }
+
+                return list;
+            }
+        }
+        catch { }
+
+        return list;
+    }
+
+    public async Task<List<HqWarehouseStockItemDto>> GetWarehouseStockReportAsync(int? warehouseId = null)
+    {
+        var list = new List<HqWarehouseStockItemDto>();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetService<AppDbContext>();
+            if (db != null)
+            {
+                var query = db.WarehouseProducts
+                    .Include(p => p.BaseUnit)
+                    .Include(p => p.Category)
+                    .Include(p => p.Balances)
+                    .AsNoTracking();
+
+                var products = await query.Take(120).ToListAsync();
+                foreach (var p in products)
+                {
+                    decimal qoh = p.Balances?.Sum(b => b.QuantityOnHand) ?? 0m;
+                    decimal cost = p.WeightedAverageCost > 0 ? p.WeightedAverageCost : p.LastPurchaseCost;
+                    list.Add(new HqWarehouseStockItemDto
+                    {
+                        ProductId = p.Id,
+                        SKU = p.SKU,
+                        ProductName = p.NameAr,
+                        CategoryName = p.Category?.NameAr ?? p.CategoryName ?? "خامات مركزية",
+                        UnitName = p.BaseUnit?.Symbol ?? p.BaseUnit?.NameAr ?? "كجم",
+                        QuantityOnHand = qoh,
+                        WeightedAverageCost = cost,
+                        MinStockLevel = p.MinStockLevel
+                    });
+                }
+
+                return list;
+            }
+        }
+        catch { }
+
+        return list;
+    }
+
+    public async Task<List<HqRequisitionDetailDto>> GetDetailedRequisitionsAsync(int? branchId = null)
+    {
+        var list = new List<HqRequisitionDetailDto>();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetService<AppDbContext>();
+            if (db != null)
+            {
+                var query = db.BranchRequisitions
+                    .Include(r => r.Lines!)
+                        .ThenInclude(l => l.Product)
+                    .Include(r => r.Lines!)
+                        .ThenInclude(l => l.Unit)
+                    .Include(r => r.RequestingBranch)
+                    .Include(r => r.TargetWarehouse)
+                    .AsNoTracking();
+
+                if (branchId.HasValue && branchId.Value > 0)
+                    query = query.Where(r => r.RequestingBranchId == branchId.Value);
+
+                var reqs = await query.OrderByDescending(r => r.RequestDate).Take(60).ToListAsync();
+                foreach (var r in reqs)
+                {
+                    var dto = new HqRequisitionDetailDto
+                    {
+                        RequisitionId = r.Id,
+                        RequisitionNumber = r.RequisitionNumber,
+                        BranchId = r.RequestingBranchId,
+                        BranchName = r.RequestingBranch?.Name ?? $"فرع #{r.RequestingBranchId}",
+                        TargetWarehouseName = r.TargetWarehouse?.NameAr ?? "المخزن الرئيسي المركزي",
+                        RequestedDate = r.RequestDate,
+                        Status = r.Status.ToString(),
+                        EstimatedTotal = 0m
+                    };
+
+                    if (r.Lines != null)
+                    {
+                        foreach (var l in r.Lines)
+                        {
+                            dto.Lines.Add(new HqRequisitionLineDto
+                            {
+                                ProductName = l.Product?.NameAr ?? "صنف خام",
+                                UnitName = l.Unit?.Symbol ?? l.Unit?.NameAr ?? "وحدة",
+                                RequestedQty = l.RequestedQuantity,
+                                ApprovedQty = l.ApprovedQuantity,
+                                DispatchedQty = l.DispatchedQuantity,
+                                UnitCost = 0m
+                            });
+                        }
+                    }
+
+                    list.Add(dto);
+                }
+
+                return list;
+            }
+        }
+        catch { }
+
+        return list;
+    }
+
+    public async Task<List<HqStockMovementDto>> GetStockMovementsAsync(int? warehouseId = null)
+    {
+        var list = new List<HqStockMovementDto>();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetService<AppDbContext>();
+            if (db != null)
+            {
+                var query = db.StockLedger
+                    .Include(s => s.Warehouse)
+                    .Include(s => s.Product)
+                    .AsNoTracking();
+
+                if (warehouseId.HasValue && warehouseId.Value > 0)
+                    query = query.Where(s => s.WarehouseId == warehouseId.Value);
+
+                var ledgers = await query.OrderByDescending(s => s.MovementDate).Take(80).ToListAsync();
+                foreach (var s in ledgers)
+                {
+                    list.Add(new HqStockMovementDto
+                    {
+                        Id = s.Id,
+                        WarehouseName = s.Warehouse?.NameAr ?? "المخزن المركزي",
+                        ProductName = s.Product?.NameAr ?? "مادة خام",
+                        MovementType = s.MovementType.ToString(),
+                        Quantity = s.QuantityIn > 0 ? s.QuantityIn : s.QuantityOut,
+                        UnitCost = s.UnitCost,
+                        MovementDate = s.MovementDate,
+                        ReferenceNumber = !string.IsNullOrWhiteSpace(s.ReferenceDocumentNumber) ? s.ReferenceDocumentNumber : $"TRX-{s.Id}"
+                    });
+                }
+
+                return list;
+            }
+        }
+        catch { }
+
+        return list;
     }
 
     public async Task<HqSyncMetricsReport> GetSyncMetricsReportAsync()
@@ -996,364 +1228,8 @@ public sealed class HqDataSyncService
         }
         catch { }
 
-        report.TotalOrdersSynced = 1845;
-        report.TotalOrderItemsSynced = 4210;
-        report.TotalAttributesSynced = 1940;
-        report.TotalVoidsSynced = 38;
-        report.TotalRequisitionsSynced = 42;
-        report.TotalPnLSnapshotsSynced = 90;
-        report.TotalCostBatchesSynced = 145;
-        report.TotalExpensesSynced = 112;
-        report.TotalSalesValueSynced = 438031m;
-        report.TotalVoidValueSynced = 4682m;
         return report;
     }
 
-    private static List<HqOrderAuditDto> GetDemoAuditOrders()
-    {
-        return new List<HqOrderAuditDto>
-        {
-            new()
-            {
-                Id = 101,
-                OrderId = 48201,
-                BranchId = 1,
-                BranchName = "فرع مدينة نصر",
-                OrderDate = DateTime.Now.AddMinutes(-12),
-                OrderType = "صالة (Dine-In)",
-                OrderState = "مكتمل",
-                TableName = "طاولة 4 - صالة رئيسية",
-                CashierName = "محمود عادل",
-                WaiterName = "كابتن زياد",
-                Subtotal = 485m,
-                Tax = 67.9m,
-                Service = 58.2m,
-                GrandTotal = 611.1m,
-                Paid = 620m,
-                Remain = 8.9m,
-                PaymentMethod = "فيزا / بطاقة بنكية",
-                HasVoid = true,
-                VoidAmount = 95m,
-                VoidByName = "م / ممدوح الصاوي (مدير صالة)",
-                VoidReason = "تأخر العميل ورغبة الزبون في الإلغاء قبل التحضير",
-                VoidTime = DateTime.Now.AddMinutes(-20),
-                Items = new List<HqOrderItemAuditDto>
-                {
-                    new()
-                    {
-                        Id = 1,
-                        ItemName = "برجر نيو تك سوبريم دبل",
-                        CategoryName = "سندوتشات اللحم",
-                        UnitPrice = 190m,
-                        Quantity = 2,
-                        TotalAmount = 380m,
-                        LineComment = "العيش محمص زيادة وبدون بصل",
-                        Attributes = new List<HqOrderItemAttributeDto>
-                        {
-                            new() { AttributeName = "حجم دبل سوبريم", ExtraPrice = 30m },
-                            new() { AttributeName = "إكسترا جبن شيدر ذائب", ExtraPrice = 25m },
-                            new() { AttributeName = "صوص باربيكيو مدخن", ExtraPrice = 15m }
-                        }
-                    },
-                    new()
-                    {
-                        Id = 2,
-                        ItemName = "بطاطس كيرلي بالجبن والبيكون",
-                        CategoryName = "الأطباق الجانبية",
-                        UnitPrice = 70m,
-                        Quantity = 1,
-                        TotalAmount = 70m,
-                        Attributes = new List<HqOrderItemAttributeDto>
-                        {
-                            new() { AttributeName = "صوص هالبينو حار", ExtraPrice = 10m }
-                        }
-                    },
-                    new()
-                    {
-                        Id = 3,
-                        ItemName = "سلطة سيزر بالدجاج المشوي",
-                        CategoryName = "السلطات والمقبلات",
-                        UnitPrice = 95m,
-                        Quantity = 1,
-                        TotalAmount = 95m,
-                        IsVoided = true,
-                        VoidQuantity = 1,
-                        TotalVoidAmount = 95m,
-                        VoidByName = "كابتن زياد",
-                        VoidReason = "طلب العميل صنف بديل",
-                        VoidTime = DateTime.Now.AddMinutes(-20)
-                    }
-                }
-            },
-            new()
-            {
-                Id = 102,
-                OrderId = 48202,
-                BranchId = 2,
-                BranchName = "فرع المعادي",
-                OrderDate = DateTime.Now.AddMinutes(-34),
-                OrderType = "دليفري (Delivery)",
-                OrderState = "قيد التوصيل",
-                CustomerName = "د / هشام فوزي",
-                Phone = "01098877665",
-                DriverName = "طارق المندوب",
-                Subtotal = 340m,
-                DeliveryFees = 35m,
-                GrandTotal = 375m,
-                Paid = 400m,
-                Remain = 25m,
-                PaymentMethod = "كاش نقدي",
-                Items = new List<HqOrderItemAuditDto>
-                {
-                    new()
-                    {
-                        Id = 4,
-                        ItemName = "بيتزا تروفل رانش كرانشي",
-                        CategoryName = "البيتزا الإيطالية",
-                        UnitPrice = 210m,
-                        Quantity = 1,
-                        TotalAmount = 210m,
-                        Attributes = new List<HqOrderItemAttributeDto>
-                        {
-                            new() { AttributeName = "حجم لارج عائلي", ExtraPrice = 45m },
-                            new() { AttributeName = "عجينة إيطالية رقيقة", ExtraPrice = 0m }
-                        }
-                    },
-                    new()
-                    {
-                        Id = 5,
-                        ItemName = "تشيكن ستريبس مقرمش (5 قطع)",
-                        CategoryName = "المقبلات",
-                        UnitPrice = 130m,
-                        Quantity = 1,
-                        TotalAmount = 130m,
-                        LineComment = "الصوص باربيكيو وليس حار"
-                    }
-                }
-            },
-            new()
-            {
-                Id = 103,
-                OrderId = 48203,
-                BranchId = 3,
-                BranchName = "فرع التجمع الخامس",
-                OrderDate = DateTime.Now.AddMinutes(-55),
-                OrderType = "تيك أواي (Takeaway)",
-                OrderState = "مكتمل",
-                CashierName = "إبراهيم ناصر",
-                Subtotal = 520m,
-                TotalDiscount = 52m,
-                DiscountReason = "خصم عملاء VIP - 10%",
-                DiscountByName = "أ / محمد حسام",
-                GrandTotal = 468m,
-                Paid = 468m,
-                PaymentMethod = "محفظة إلكترونية (Vodafone Cash)",
-                Items = new List<HqOrderItemAuditDto>
-                {
-                    new()
-                    {
-                        Id = 6,
-                        ItemName = "وجبة ميكس جريل مشوي",
-                        CategoryName = "الأطباق الرئيسية",
-                        UnitPrice = 360m,
-                        Quantity = 1,
-                        TotalAmount = 360m,
-                        Attributes = new List<HqOrderItemAttributeDto>
-                        {
-                            new() { AttributeName = "أرز بسمتي أصفر خلطة", ExtraPrice = 20m },
-                            new() { AttributeName = "خبز شامي ساخن", ExtraPrice = 0m }
-                        }
-                    },
-                    new()
-                    {
-                        Id = 7,
-                        ItemName = "شوربة كريمة الدجاج بالفطر",
-                        CategoryName = "الشوربات",
-                        UnitPrice = 80m,
-                        Quantity = 2,
-                        TotalAmount = 160m
-                    }
-                }
-            }
-        };
-    }
-
-    private static List<HqDailyPnLDto> GetDemoDailyPnL()
-    {
-        return new List<HqDailyPnLDto>
-        {
-            new() { Date = DateTime.Today, BranchId = 1, BranchName = "فرع مدينة نصر", TotalGrossSales = 52400m, TotalDiscounts = 2100m, TotalVoids = 450m, NetSales = 49850m, TotalCOGS = 18450m, TotalWasteCost = 320m, TotalInventoryPurchases = 4200m, GrossProfit = 31400m, GrossProfitMargin = 63.0m, TotalExpenses = 6200m, NetProfit = 25200m, OrderCount = 231, CalculatedAt = DateTime.Now },
-            new() { Date = DateTime.Today, BranchId = 2, BranchName = "فرع المعادي", TotalGrossSales = 41200m, TotalDiscounts = 1650m, TotalVoids = 280m, NetSales = 39270m, TotalCOGS = 14920m, TotalWasteCost = 180m, TotalInventoryPurchases = 3100m, GrossProfit = 24350m, GrossProfitMargin = 62.0m, TotalExpenses = 5100m, NetProfit = 19250m, OrderCount = 185, CalculatedAt = DateTime.Now },
-            new() { Date = DateTime.Today, BranchId = 3, BranchName = "فرع التجمع الخامس", TotalGrossSales = 64800m, TotalDiscounts = 2900m, TotalVoids = 620m, NetSales = 61280m, TotalCOGS = 22670m, TotalWasteCost = 410m, TotalInventoryPurchases = 5800m, GrossProfit = 38610m, GrossProfitMargin = 63.0m, TotalExpenses = 7800m, NetProfit = 30810m, OrderCount = 289, CalculatedAt = DateTime.Now }
-        };
-    }
-
-    private static List<HqCostBatchDto> GetDemoCostBatches()
-    {
-        return new List<HqCostBatchDto>
-        {
-            new() { BranchId = 1, MenuSalesItemId = 14, ItemName = "أرز بسمتي درجة أولى", BatchSource = "WarehouseTransfer", ReferenceId = "REQ-2026-084", OriginalQuantity = 50, RemainingQuantity = 22, UnitCost = 58m, UnitName = "كجم", Priority = 2, IsExhausted = false, ReceivedAt = DateTime.Now.AddDays(-2) },
-            new() { BranchId = 1, MenuSalesItemId = 89, ItemName = "صدور دجاج متبلة", BatchSource = "ExpensePurchase", ReferenceId = "EXP-00142", OriginalQuantity = 30, RemainingQuantity = 8, UnitCost = 195m, UnitName = "كجم", Priority = 1, IsExhausted = false, ReceivedAt = DateTime.Now.AddDays(-1) },
-            new() { BranchId = 2, MenuSalesItemId = 22, ItemName = "زيت قلي نقي نباتي", BatchSource = "WarehouseTransfer", ReferenceId = "REQ-2026-079", OriginalQuantity = 40, RemainingQuantity = 14, UnitCost = 49m, UnitName = "لتر", Priority = 2, IsExhausted = false, ReceivedAt = DateTime.Now.AddDays(-3) }
-        };
-    }
-
     private void NotifyStateChanged() => OnSyncStateChanged?.Invoke();
-
-    private static List<HqNodeConfig> GetDefaultNodesSeed()
-    {
-        return new List<HqNodeConfig>
-        {
-            // Branches
-            new()
-            {
-                Id = "br-nasr",
-                Code = "BR-01",
-                Name = "فرع مدينة نصر",
-                NameEn = "Nasr City Branch",
-                NodeType = HqNodeType.Branch,
-                City = "القاهرة",
-                Address = "شارع عباس العقاد، المنطقة الأولى",
-                Phone = "01001234561",
-                ManagerName = "أ / محمود طارق",
-                ApiUrl = "http://100.79.100.86:5050",
-                IsActive = true,
-                Status = HqSyncStatus.Online,
-                PingLatencyMs = 18,
-                TodayRevenue = 42800m,
-                TodayOrdersCount = 231,
-                LastSyncAt = DateTime.Now.AddMinutes(-4),
-                LinkedWarehouseName = "المخزن الرئيسي المركزي - القاهرة",
-                LastSyncMessage = "مزامنة ناجحة ومحدثة"
-            },
-            new()
-            {
-                Id = "br-maadi",
-                Code = "BR-02",
-                Name = "فرع المعادي",
-                NameEn = "Maadi Branch",
-                NodeType = HqNodeType.Branch,
-                City = "القاهرة",
-                Address = "شارع النصر، دجلة المعادي",
-                Phone = "01001234562",
-                ManagerName = "أ / حسام الدين حسن",
-                ApiUrl = "http://100.79.100.87:5050",
-                IsActive = true,
-                Status = HqSyncStatus.Online,
-                PingLatencyMs = 24,
-                TodayRevenue = 36500m,
-                TodayOrdersCount = 194,
-                LastSyncAt = DateTime.Now.AddMinutes(-7),
-                LinkedWarehouseName = "المخزن الرئيسي المركزي - القاهرة",
-                LastSyncMessage = "مزامنة ناجحة"
-            },
-            new()
-            {
-                Id = "br-tagamoa",
-                Code = "BR-03",
-                Name = "فرع التجمع الخامس",
-                NameEn = "Tagamoa 5th Branch",
-                NodeType = HqNodeType.Branch,
-                City = "القاهرة الجديدة",
-                Address = "شارع التسعين الشمالي، داون تاون مول",
-                Phone = "01001234563",
-                ManagerName = "أ / كريم الشناوي",
-                ApiUrl = "http://100.79.100.88:5050",
-                IsActive = true,
-                Status = HqSyncStatus.Online,
-                PingLatencyMs = 15,
-                TodayRevenue = 51200m,
-                TodayOrdersCount = 276,
-                LastSyncAt = DateTime.Now.AddMinutes(-2),
-                LinkedWarehouseName = "المخزن الرئيسي المركزي - القاهرة",
-                LastSyncMessage = "مزامنة نشطة"
-            },
-            new()
-            {
-                Id = "br-mohandessin",
-                Code = "BR-04",
-                Name = "فرع المهندسين",
-                NameEn = "Mohandessin Branch",
-                NodeType = HqNodeType.Branch,
-                City = "الجيزة",
-                Address = "شارع جامعة الدول العربية",
-                Phone = "01001234564",
-                ManagerName = "أ / عمرو عبد العزيز",
-                ApiUrl = "http://100.79.100.89:5050",
-                IsActive = true,
-                Status = HqSyncStatus.Online,
-                PingLatencyMs = 29,
-                TodayRevenue = 39100m,
-                TodayOrdersCount = 208,
-                LastSyncAt = DateTime.Now.AddMinutes(-9),
-                LinkedWarehouseName = "المخزن الرئيسي المركزي - القاهرة",
-                LastSyncMessage = "مزامنة دورية"
-            },
-            new()
-            {
-                Id = "br-alex-stanley",
-                Code = "BR-05",
-                Name = "فرع كوبري ستانلي",
-                NameEn = "Alex Stanley Branch",
-                NodeType = HqNodeType.Branch,
-                City = "الإسكندرية",
-                Address = "طريق الجيش، كورنيش ستانلي",
-                Phone = "01001234565",
-                ManagerName = "أ / هاني يوسف",
-                ApiUrl = "http://100.79.100.90:5050",
-                IsActive = true,
-                Status = HqSyncStatus.Online,
-                PingLatencyMs = 45,
-                TodayRevenue = 47300m,
-                TodayOrdersCount = 245,
-                LastSyncAt = DateTime.Now.AddMinutes(-12),
-                LinkedWarehouseName = "المخزن الإقليمي - الإسكندرية",
-                LastSyncMessage = "مزامنة دورية"
-            },
-
-            // Main / Central Warehouses
-            new()
-            {
-                Id = "wh-cairo-central",
-                Code = "WH-MAIN-01",
-                Name = "المخزن الرئيسي المركزي - القاهرة الكبرى",
-                NameEn = "Cairo Central Main Warehouse",
-                NodeType = HqNodeType.MainWarehouse,
-                City = "القاهرة",
-                Address = "المنطقة الصناعية، التجمع الأول، مخزن قطاع رقم 4",
-                Phone = "01099887766",
-                ManagerName = "م / ممدوح الصاوي",
-                ApiUrl = "http://100.79.100.86:5050",
-                IsActive = true,
-                Status = HqSyncStatus.Online,
-                PingLatencyMs = 16,
-                StockValuation = 2480000m,
-                StockItemsCount = 480,
-                LowStockItemsCount = 5,
-                LastSyncAt = DateTime.Now.AddMinutes(-3),
-                LastSyncMessage = "متصل - جرد نشط"
-            },
-            new()
-            {
-                Id = "wh-alex-regional",
-                Code = "WH-MAIN-02",
-                Name = "المخزن الإقليمي - قطاع الإسكندرية والساحل",
-                NameEn = "Alexandria Regional Main Warehouse",
-                NodeType = HqNodeType.MainWarehouse,
-                City = "الإسكندرية",
-                Address = "المنطقة الصناعية ببرج العرب، مجمع المخازن A2",
-                Phone = "01099887755",
-                ManagerName = "أ / صبحي عبد السلام",
-                ApiUrl = "http://100.79.100.91:5050",
-                IsActive = true,
-                Status = HqSyncStatus.Online,
-                PingLatencyMs = 42,
-                StockValuation = 1350000m,
-                StockItemsCount = 310,
-                LowStockItemsCount = 3,
-                LastSyncAt = DateTime.Now.AddMinutes(-8),
-                LastSyncMessage = "متصل - جرد نشط"
-            }
-        };
-    }
 }

@@ -100,24 +100,37 @@
             @foreach (var branch in FilteredBranches)
             {
                 <div class="branch-card @(branch.IsActive ? "" : "disabled-card")">
-                    <!-- Card Header Row -->
+                    <!-- Card Top Header -->
                     <div class="card-top-header">
-                        <div class="header-left">
-                            <span class="branch-code-badge">@branch.Code</span>
-                            <div class="status-badges-row">
-                                <div class="status-indicator-badge @GetStatusClass(branch.Status)">
-                                    <span class="status-dot"></span>
-                                    <span class="status-label-txt">@GetStatusLabel(branch.Status)</span>
+                        <div class="header-right-meta">
+                            <div class="branch-icon-badge">
+                                <MudIcon Icon="@Icons.Material.Rounded.Storefront" Size="Size.Medium" Class="gold-icon" />
+                            </div>
+                            <div class="branch-title-group">
+                                <div class="branch-name-row">
+                                    <h3 class="branch-name">@branch.Name</h3>
+                                    @if (!string.IsNullOrWhiteSpace(branch.NameEn))
+                                    {
+                                        <span class="branch-en-tag">@branch.NameEn</span>
+                                    }
                                 </div>
-                                @if (branch.PingLatencyMs.HasValue && branch.Status == HqSyncStatus.Online)
-                                {
-                                    <span class="latency-pill" dir="ltr">@branch.PingLatencyMs ms</span>
-                                }
+                                <span class="branch-city">
+                                    <MudIcon Icon="@Icons.Material.Rounded.LocationOn" Size="Size.Small" Class="mini-pin" />
+                                    @branch.City @(string.IsNullOrWhiteSpace(branch.Address) ? "" : $"· {branch.Address}")
+                                </span>
                             </div>
                         </div>
-                        <div class="header-right">
-                            <h3 class="branch-name">@branch.Name</h3>
-                            <span class="branch-city">@branch.City @(string.IsNullOrWhiteSpace(branch.Address) ? "" : $"· {branch.Address}")</span>
+
+                        <div class="header-left-badges">
+                            <span class="branch-id-pill">رقم #@branch.Id · @branch.Code</span>
+                            <div class="status-indicator-badge @GetStatusClass(branch.Status)">
+                                <span class="status-dot"></span>
+                                <span class="status-label-txt">@GetStatusLabel(branch.Status)</span>
+                                @if (branch.PingLatencyMs.HasValue && branch.Status == HqSyncStatus.Online)
+                                {
+                                    <span class="latency-sub" dir="ltr">(@branch.PingLatencyMs ms)</span>
+                                }
+                            </div>
                         </div>
                     </div>
 
@@ -125,7 +138,7 @@
                     <div class="branch-stats-strip">
                         <div class="strip-item">
                             <span class="strip-label">مبيعات اليوم</span>
-                            <span class="strip-val gold-val">@branch.TodayRevenue.ToString("N0") <small>ج.م</small></span>
+                            <span class="strip-val gold-val">@branch.TodayRevenue.ToString("N2") <small>ج.م</small></span>
                         </div>
                         <div class="strip-divider"></div>
                         <div class="strip-item">
@@ -135,7 +148,7 @@
                         <div class="strip-divider"></div>
                         <div class="strip-item">
                             <span class="strip-label">متوسط الفاتورة</span>
-                            <span class="strip-val">@(branch.TodayOrdersCount > 0 ? (branch.TodayRevenue / branch.TodayOrdersCount).ToString("N0") : "0") <small>ج.م</small></span>
+                            <span class="strip-val">@(branch.TodayOrdersCount > 0 ? (branch.TodayRevenue / branch.TodayOrdersCount).ToString("N2") : "0.00") <small>ج.م</small></span>
                         </div>
                     </div>
 
@@ -143,36 +156,44 @@
                     <div class="card-details-grid">
                         <div class="detail-item">
                             <span class="detail-icon">🌐</span>
-                            <span class="detail-label">رابط السيرفر (API URL):</span>
+                            <span class="detail-label">رابط السيرفر (API):</span>
                             <span class="detail-val api-url" dir="ltr" title="@branch.ApiUrl">@branch.ApiUrl</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-icon">🏭</span>
-                            <span class="detail-label">المخزن الرئيسي المورد:</span>
-                            <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.LinkedWarehouseName) ? "غير محدد" : branch.LinkedWarehouseName)</span>
+                            <span class="detail-label">المخزن الرئيسي:</span>
+                            <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.LinkedWarehouseName) ? "المخزن الرئيسي المركزي" : branch.LinkedWarehouseName)</span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-icon">👤</span>
                             <span class="detail-label">مدير الفرع:</span>
-                            <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.ManagerName) ? "-" : branch.ManagerName)</span>
+                            <span class="detail-val">@(string.IsNullOrWhiteSpace(branch.ManagerName) ? "مدير الفرع" : branch.ManagerName)</span>
                         </div>
+                        @if (!string.IsNullOrWhiteSpace(branch.Phone))
+                        {
+                            <div class="detail-item">
+                                <span class="detail-icon">📞</span>
+                                <span class="detail-label">هاتف الفرع:</span>
+                                <span class="detail-val" dir="ltr">@branch.Phone</span>
+                            </div>
+                        }
                     </div>
 
-                    <div class="last-sync-bar">
-                        <MudIcon Icon="@Icons.Material.Rounded.History" Size="Size.Small" Class="sync-time-icon" />
-                        <span>آخر سحب بيانات: @(branch.LastSyncAt.HasValue ? branch.LastSyncAt.Value.ToString("yyyy-MM-dd hh:mm tt") : "لم يتم السحب بعد")</span>
+                    <div class="last-sync-bar" title="@branch.LastSyncMessage">
+                        <MudIcon Icon="@Icons.Material.Rounded.Sync" Size="Size.Small" Class="sync-time-icon" />
+                        <span class="sync-date-txt">آخر سحب: @(branch.LastSyncAt.HasValue ? branch.LastSyncAt.Value.ToString("yyyy-MM-dd hh:mm tt") : "لم يتم السحب بعد")</span>
                     </div>
 
                     <div class="card-footer-actions">
-                        <button class="footer-btn ping-btn" title="فحص اتصال الفرع" @onclick="() => TestSingleConnection(branch)">
+                        <button class="footer-btn ping-btn" title="فحص اتصال سيرفر الفرع" @onclick="() => TestSingleConnection(branch)">
                             <MudIcon Icon="@Icons.Material.Rounded.NetworkPing" Size="Size.Small" />
                             <span>فحص الاتصال</span>
                         </button>
-                        <button class="footer-btn pull-btn" title="سحب مبيعات الفرع الآن" @onclick="() => PullSingleBranch(branch)">
+                        <button class="footer-btn pull-btn" title="سحب ومزامنة مبيعات الفرع الآن" @onclick="() => PullSingleBranch(branch)">
                             <MudIcon Icon="@Icons.Material.Rounded.DownloadForOffline" Size="Size.Small" />
                             <span>سحب الداتا</span>
                         </button>
-                        <button class="footer-btn edit-btn" title="تعديل بيانات الفرع" @onclick="() => OpenEditModal(branch)">
+                        <button class="footer-btn edit-btn" title="تعديل بيانات ورابط الفرع" @onclick="() => OpenEditModal(branch)">
                             <MudIcon Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" />
                             <span>تعديل</span>
                         </button>

@@ -212,24 +212,36 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var pnl in _pnlList)
+                    @if (_pnlList.Count == 0)
                     {
                         <tr>
-                            <td><strong dir="ltr">@pnl.Date.ToString("yyyy-MM-dd")</strong></td>
-                            <td>@pnl.BranchName</td>
-                            <td>@pnl.TotalGrossSales.ToString("N0") ج.م</td>
-                            <td class="text-danger">@pnl.TotalDiscounts.ToString("N0") ج.م</td>
-                            <td class="text-danger">@pnl.TotalVoids.ToString("N0") ج.م</td>
-                            <td><strong>@pnl.NetSales.ToString("N0") ج.م</strong></td>
-                            <td class="text-warning">@pnl.TotalCOGS.ToString("N0") ج.م</td>
-                            <td class="text-danger">@pnl.TotalWasteCost.ToString("N0") ج.م</td>
-                            <td class="text-warning">@pnl.TotalExpenses.ToString("N0") ج.م</td>
-                            <td class="gold-txt">@pnl.GrossProfit.ToString("N0") ج.م</td>
-                            <td><strong>@pnl.GrossProfitMargin.ToString("N1")%</strong></td>
-                            <td>
-                                <strong class="profit-highlight">@pnl.NetProfit.ToString("N0") ج.م</strong>
+                            <td colspan="12" class="empty-cell">
+                                <MudIcon Icon="@Icons.Material.Rounded.QueryStats" Size="Size.Large" Class="empty-icon" />
+                                <p>لا توجد سجلات قوائم دخل (Daily P&L) مسحوبة بعد. قم بالضغط على "سحب داتا كل الفروع" لجلب الحركات وقوائم الدخل.</p>
                             </td>
                         </tr>
+                    }
+                    else
+                    {
+                        @foreach (var pnl in _pnlList)
+                        {
+                            <tr>
+                                <td><strong dir="ltr">@pnl.Date.ToString("yyyy-MM-dd")</strong></td>
+                                <td>@pnl.BranchName</td>
+                                <td>@pnl.TotalGrossSales.ToString("N0") ج.م</td>
+                                <td class="text-danger">@pnl.TotalDiscounts.ToString("N0") ج.م</td>
+                                <td class="text-danger">@pnl.TotalVoids.ToString("N0") ج.م</td>
+                                <td><strong>@pnl.NetSales.ToString("N0") ج.م</strong></td>
+                                <td class="text-warning">@pnl.TotalCOGS.ToString("N0") ج.م</td>
+                                <td class="text-danger">@pnl.TotalWasteCost.ToString("N0") ج.م</td>
+                                <td class="text-warning">@pnl.TotalExpenses.ToString("N0") ج.م</td>
+                                <td class="gold-txt">@pnl.GrossProfit.ToString("N0") ج.م</td>
+                                <td><strong>@pnl.GrossProfitMargin.ToString("N1")%</strong></td>
+                                <td>
+                                    <strong class="profit-highlight">@pnl.NetProfit.ToString("N0") ج.م</strong>
+                                </td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
@@ -259,33 +271,45 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var batch in _batchesList)
+                    @if (_batchesList.Count == 0)
                     {
                         <tr>
-                            <td>فرع @batch.BranchId</td>
-                            <td><strong>@batch.ItemName</strong></td>
-                            <td>
-                                <span class="badge-source @(batch.BatchSource == "ExpensePurchase" ? "source-expense" : "source-transfer")">
-                                    @(batch.BatchSource == "ExpensePurchase" ? "شراء نقدي من الدرج" : "تحويل مخزن مركزي")
-                                </span>
+                            <td colspan="10" class="empty-cell">
+                                <MudIcon Icon="@Icons.Material.Rounded.LayersClear" Size="Size.Large" Class="empty-icon" />
+                                <p>لا توجد طبقات تكلفة مخزون (Cost Batches) مسحوبة بعد. قم بسحب البيانات لعرض طبقات التكلفة ومشتريات الدرج.</p>
                             </td>
-                            <td><code dir="ltr">@batch.ReferenceId</code></td>
-                            <td>@batch.OriginalQuantity @batch.UnitName</td>
-                            <td><strong>@batch.RemainingQuantity @batch.UnitName</strong></td>
-                            <td>@batch.UnitCost.ToString("N2") ج.م</td>
-                            <td><span class="priority-tag">أولوية @batch.Priority</span></td>
-                            <td>
-                                @if (batch.IsExhausted)
-                                {
-                                    <span class="exhausted-badge">منفذة بالكامل</span>
-                                }
-                                else
-                                {
-                                    <span class="active-batch-badge">متاحة للصرف</span>
-                                }
-                            </td>
-                            <td><span dir="ltr">@batch.ReceivedAt.ToString("yyyy-MM-dd")</span></td>
                         </tr>
+                    }
+                    else
+                    {
+                        @foreach (var batch in _batchesList)
+                        {
+                            <tr>
+                                <td>فرع @batch.BranchId</td>
+                                <td><strong>@batch.ItemName</strong></td>
+                                <td>
+                                    <span class="badge-source @(batch.BatchSource == "ExpensePurchase" ? "source-expense" : "source-transfer")">
+                                        @(batch.BatchSource == "ExpensePurchase" ? "شراء نقدي من الدرج" : "تحويل مخزن مركزي")
+                                    </span>
+                                </td>
+                                <td><code dir="ltr">@batch.ReferenceId</code></td>
+                                <td>@batch.OriginalQuantity @batch.UnitName</td>
+                                <td><strong>@batch.RemainingQuantity @batch.UnitName</strong></td>
+                                <td>@batch.UnitCost.ToString("N2") ج.م</td>
+                                <td><span class="priority-tag">أولوية @batch.Priority</span></td>
+                                <td>
+                                    @if (batch.IsExhausted)
+                                    {
+                                        <span class="exhausted-badge">منفذة بالكامل</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="active-batch-badge">متاحة للصرف</span>
+                                    }
+                                </td>
+                                <td><span dir="ltr">@batch.ReceivedAt.ToString("yyyy-MM-dd")</span></td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
