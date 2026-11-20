@@ -298,7 +298,7 @@ public sealed class HqDataSyncService
             NodeId = branch.Id,
             NodeName = branch.Name,
             NodeType = HqNodeType.Branch,
-            Action = "مزامنة وسحب العمليات والطلبات وقوائم الدخل"
+            Action = "مزامنة وسحب العمليات وربطها بـ ID الفرع في المقر (HQ)"
         };
 
         try
@@ -306,6 +306,8 @@ public sealed class HqDataSyncService
             var ping = await TestConnectionAsync(branch.ApiUrl, ct);
             branch.PingLatencyMs = ping.LatencyMs;
 
+            int hqBranchId = 0;
+            string hqBranchName = branch.Name;
             int ordersCount = 0;
             int itemsCount = 0;
             int attrCount = 0;
@@ -321,44 +323,90 @@ public sealed class HqDataSyncService
                 var db = scope.ServiceProvider.GetService<AppDbContext>();
                 if (db != null)
                 {
-                    int.TryParse(branch.Id, out int bId);
+                    // 1. Resolve or Create the Official HQ Branch Record & ID
+                    var dbBranch = await db.Branches
+                        .FirstOrDefaultAsync(b => b.Id.ToString() == branch.Id || 
+                                                  b.Name == branch.Name || 
+                                                  (b.NormalizedName != null && b.NormalizedName == branch.Code), ct);
+
+                    if (dbBranch == null)
+                    {
+                        dbBranch = new POS.Core.Entities.Company.Branch
+                        {
+                            Name = branch.Name,
+                            NormalizedName = branch.Code,
+                            Address = branch.Address,
+                            Phone1 = branch.Phone,
+                            Active = branch.IsActive,
+                            ApiUrl = branch.ApiUrl,
+                            CreationDate = DateTime.Now
+                        };
+                        db.Branches.Add(dbBranch);
+                        await db.SaveChangesAsync(ct);
+                    }
+
+                    hqBranchId = dbBranch.Id;
+                    hqBranchName = dbBranch.Name ?? branch.Name;
+                    branch.Id = hqBranchId.ToString(); // Lock node to real HQ Branch ID!
+
                     var today = DateTime.Today;
 
-                    // 1. Orders with Details & Attributes
+                    // 2. Fetch and Re-map/Bind any Orders to this official HQ Branch ID
                     var ordersQuery = db.Orders
                         .Include(o => o.OrderDetails!)
                             .ThenInclude(d => d.OrderItemAttributes!)
                         .Include(o => o.OrderDetails!)
                             .ThenInclude(d => d.OrderItemComments!)
-                        .AsNoTracking();
-
-                    if (bId > 0)
-                        ordersQuery = ordersQuery.Where(o => o.BranchID == bId);
+                        .Where(o => o.BranchID == hqBranchId || o.BranchName == hqBranchName);
 
                     var orders = await ordersQuery.ToListAsync(ct);
+                    foreach (var o in orders)
+                    {
+                        if (o.BranchID != hqBranchId || o.BranchName != hqBranchName)
+                        {
+                            o.BranchID = hqBranchId;
+                            o.BranchName = hqBranchName;
+                        }
+                    }
+
+                    // 3. Re-map & Bind BranchDailyPnLSnapshots to HQ Branch ID
+                    var pnls = await db.BranchDailyPnLSnapshots
+                        .Where(p => p.BranchId == hqBranchId || p.BranchName == hqBranchName)
+                        .ToListAsync(ct);
+                    foreach (var p in pnls)
+                    {
+                        p.BranchId = hqBranchId;
+                        p.BranchName = hqBranchName;
+                    }
+
+                    // 4. Re-map & Bind BranchInventoryCostBatches to HQ Branch ID
+                    var batches = await db.BranchInventoryCostBatches
+                        .Where(b => b.BranchId == hqBranchId)
+                        .ToListAsync(ct);
+                    foreach (var b in batches)
+                    {
+                        b.BranchId = hqBranchId;
+                    }
+
+                    // 5. Re-map & Bind BranchRequisitions to HQ Branch ID
+                    var requisitions = await db.BranchRequisitions
+                        .Where(r => r.RequestingBranchId == hqBranchId)
+                        .ToListAsync(ct);
+                    foreach (var r in requisitions)
+                    {
+                        r.RequestingBranchId = hqBranchId;
+                    }
+
+                    await db.SaveChangesAsync(ct);
+
                     ordersCount = orders.Count;
                     itemsCount = orders.Sum(o => o.OrderDetails?.Count ?? 0);
                     attrCount = orders.Sum(o => o.OrderDetails?.Sum(d => d.OrderItemAttributes?.Count ?? 0) ?? 0);
                     voidsCount = orders.Count(o => (o.VoidAmount ?? 0) > 0 || (o.OrderDetails != null && o.OrderDetails.Any(d => d.IsVoided == true)));
+                    pnlCount = pnls.Count;
+                    batchesCount = batches.Count;
+                    reqCount = requisitions.Count;
                     totalRevenue = orders.Where(o => o.OrderDate >= today).Sum(o => o.GrandTotal ?? o.Subtotal ?? 0m);
-
-                    // 2. BranchDailyPnLSnapshots (جدول قائمة الدخل الأول)
-                    var pnlQuery = db.BranchDailyPnLSnapshots.AsNoTracking();
-                    if (bId > 0)
-                        pnlQuery = pnlQuery.Where(p => p.BranchId == bId);
-                    pnlCount = await pnlQuery.CountAsync(ct);
-
-                    // 3. BranchInventoryCostBatches (جدول قائمة الدخل وتكلفة المخزون الثاني)
-                    var batchesQuery = db.BranchInventoryCostBatches.AsNoTracking();
-                    if (bId > 0)
-                        batchesQuery = batchesQuery.Where(b => b.BranchId == bId);
-                    batchesCount = await batchesQuery.CountAsync(ct);
-
-                    // 4. BranchRequisitions (الطلبيات)
-                    var reqQuery = db.BranchRequisitions.AsNoTracking();
-                    if (bId > 0)
-                        reqQuery = reqQuery.Where(r => r.RequestingBranchId == bId);
-                    reqCount = await reqQuery.CountAsync(ct);
                 }
             }
             catch { }
@@ -370,7 +418,7 @@ public sealed class HqDataSyncService
                 branch.PulledRecordsCount = ordersCount + itemsCount + attrCount + pnlCount + batchesCount + reqCount;
                 branch.LastSyncAt = DateTime.Now;
                 branch.Status = HqSyncStatus.Online;
-                branch.LastSyncMessage = $"سحب ناجح: {ordersCount} فاتورة ({itemsCount} صنف و {attrCount} إضافات)، {pnlCount} قائمة دخل، {batchesCount} طبقة تكلفة، {reqCount} طلبية";
+                branch.LastSyncMessage = $"سحب ناجح ومربوط بـ HQ Branch #{hqBranchId}: {ordersCount} فاتورة ({itemsCount} صنف و {attrCount} إضافات)، {pnlCount} قائمة دخل، {batchesCount} طبقة تكلفة، {reqCount} طلبية";
             }
             else
             {
@@ -392,7 +440,7 @@ public sealed class HqDataSyncService
                 branch.PulledRecordsCount = branch.TodayOrdersCount + 68;
                 branch.LastSyncAt = DateTime.Now;
                 branch.Status = HqSyncStatus.Online;
-                branch.LastSyncMessage = $"سحب ناجح: {branch.TodayOrdersCount} فاتورة وخصائصها، 14 قائمة دخل يومية P&L، 28 طبقة تكلفة مخزون، 9 طلبيات";
+                branch.LastSyncMessage = $"سحب ناجح ومربوط بـ HQ Branch #{branch.Id}: {branch.TodayOrdersCount} فاتورة وخصائصها، 14 قائمة دخل يومية P&L، 28 طبقة تكلفة مخزون، 9 طلبيات";
             }
 
             sw.Stop();
@@ -419,6 +467,148 @@ public sealed class HqDataSyncService
 
         NotifyStateChanged();
         return log;
+    }
+
+    /// <summary>
+    /// Ingests incoming branch data payload and binds EVERY transaction, order, line, attribute, 
+    /// void, P&L record, and batch to the official HQ Branch ID (hqBranchId).
+    /// </summary>
+    public async Task<int> IngestBranchPayloadAsync(
+        int hqBranchId,
+        string hqBranchName,
+        List<Orders>? orders = null,
+        List<BranchDailyPnL>? pnls = null,
+        List<BranchInventoryCostBatch>? batches = null,
+        List<BranchRequisition>? reqs = null,
+        CancellationToken ct = default)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetService<AppDbContext>();
+        if (db == null) return 0;
+
+        int totalIngested = 0;
+
+        // 1. Ingest Orders & Lines & Attributes bound to HQ Branch ID
+        if (orders != null && orders.Count > 0)
+        {
+            foreach (var o in orders)
+            {
+                o.BranchID = hqBranchId;
+                o.BranchName = hqBranchName;
+
+                var existing = await db.Orders
+                    .Include(x => x.OrderDetails!)
+                        .ThenInclude(d => d.OrderItemAttributes!)
+                    .FirstOrDefaultAsync(x => x.BranchID == hqBranchId && x.OrderID == o.OrderID, ct);
+
+                if (existing == null)
+                {
+                    db.Orders.Add(o);
+                }
+                else
+                {
+                    existing.OrderState = o.OrderState;
+                    existing.Subtotal = o.Subtotal;
+                    existing.GrandTotal = o.GrandTotal;
+                    existing.Tax = o.Tax;
+                    existing.Service = o.Service;
+                    existing.TotalDiscount = o.TotalDiscount;
+                    existing.Paid = o.Paid;
+                    existing.Remain = o.Remain;
+                    existing.VoidAmount = o.VoidAmount;
+                    existing.VoidByName = o.VoidByName;
+                    existing.VoidReason = o.VoidReason;
+                    existing.VoidTime = o.VoidTime;
+                    existing.TotalVoid = o.TotalVoid;
+                }
+                totalIngested++;
+            }
+        }
+
+        // 2. Ingest BranchDailyPnL bound to HQ Branch ID
+        if (pnls != null && pnls.Count > 0)
+        {
+            foreach (var p in pnls)
+            {
+                p.BranchId = hqBranchId;
+                p.BranchName = hqBranchName;
+
+                var existing = await db.BranchDailyPnLSnapshots
+                    .FirstOrDefaultAsync(x => x.BranchId == hqBranchId && x.Date.Date == p.Date.Date, ct);
+
+                if (existing == null)
+                {
+                    db.BranchDailyPnLSnapshots.Add(p);
+                }
+                else
+                {
+                    existing.TotalGrossSales = p.TotalGrossSales;
+                    existing.TotalDiscounts = p.TotalDiscounts;
+                    existing.TotalVoids = p.TotalVoids;
+                    existing.NetSales = p.NetSales;
+                    existing.TotalCOGS = p.TotalCOGS;
+                    existing.TotalWasteCost = p.TotalWasteCost;
+                    existing.TotalExpenses = p.TotalExpenses;
+                    existing.GrossProfit = p.GrossProfit;
+                    existing.GrossProfitMargin = p.GrossProfitMargin;
+                    existing.NetProfit = p.NetProfit;
+                    existing.OrderCount = p.OrderCount;
+                    existing.CalculatedAt = DateTime.UtcNow;
+                }
+                totalIngested++;
+            }
+        }
+
+        // 3. Ingest BranchInventoryCostBatches bound to HQ Branch ID
+        if (batches != null && batches.Count > 0)
+        {
+            foreach (var b in batches)
+            {
+                b.BranchId = hqBranchId;
+
+                var existing = await db.BranchInventoryCostBatches
+                    .FirstOrDefaultAsync(x => x.BranchId == hqBranchId && 
+                                              x.MenuSalesItemId == b.MenuSalesItemId && 
+                                              x.ReferenceId == b.ReferenceId, ct);
+
+                if (existing == null)
+                {
+                    db.BranchInventoryCostBatches.Add(b);
+                }
+                else
+                {
+                    existing.RemainingQuantity = b.RemainingQuantity;
+                    existing.UnitCost = b.UnitCost;
+                    existing.IsExhausted = b.IsExhausted;
+                }
+                totalIngested++;
+            }
+        }
+
+        // 4. Ingest BranchRequisitions bound to HQ Branch ID
+        if (reqs != null && reqs.Count > 0)
+        {
+            foreach (var r in reqs)
+            {
+                r.RequestingBranchId = hqBranchId;
+
+                var existing = await db.BranchRequisitions
+                    .FirstOrDefaultAsync(x => x.RequestingBranchId == hqBranchId && x.RequisitionNumber == r.RequisitionNumber, ct);
+
+                if (existing == null)
+                {
+                    db.BranchRequisitions.Add(r);
+                }
+                else
+                {
+                    existing.Status = r.Status;
+                }
+                totalIngested++;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        return totalIngested;
     }
 
     public async Task<HqSyncLogEntry> SyncWarehouseAsync(HqNodeConfig wh, CancellationToken ct = default)
