@@ -1,0 +1,552 @@
+@page "/orders-audit"
+@attribute [Authorize]
+@inject HqDataSyncService SyncService
+@inject ISnackbar Snackbar
+
+<div class="audit-page" dir="rtl">
+    <!-- Header -->
+    <header class="page-head">
+        <div class="head-info">
+            <div class="title-with-badge">
+                <div class="icon-circle">
+                    <MudIcon Icon="@Icons.Material.Rounded.ReceiptLong" Size="Size.Large" Class="gold-icon" />
+                </div>
+                <div>
+                    <h1>مراجعة وتدقيق الفواتير والملغيات (Orders & Voids Audit)</h1>
+                    <p class="subtitle">سحب واستعراض تفاصيل الفواتير، الأصناف، الإضافات (Attributes)، أسباب الفويد، وقوائم الدخل اليومية للفروع</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="head-stats">
+            <div class="stat-pill">
+                <span>الفواتير المسحوبة</span>
+                <strong>@_filteredOrders.Count</strong>
+            </div>
+            <div class="stat-pill gold">
+                <span>إجمالي المبيعات</span>
+                <strong>@(_filteredOrders.Sum(o => o.GrandTotal).ToString("N0")) ج.م</strong>
+            </div>
+            <div class="stat-pill danger">
+                <span>إجمالي الفويدات</span>
+                <strong>@(_filteredOrders.Sum(o => o.VoidAmount).ToString("N0")) ج.م</strong>
+            </div>
+            <div class="stat-pill">
+                <span>خصومات ممنوحة</span>
+                <strong>@(_filteredOrders.Sum(o => o.TotalDiscount).ToString("N0")) ج.م</strong>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <div class="audit-tabs-bar">
+        <button class="audit-tab-btn @(_activeTab == "orders" ? "active" : "")" @onclick='() => _activeTab = "orders"'>
+            <MudIcon Icon="@Icons.Material.Rounded.Receipt" Size="Size.Small" />
+            <span>فواتير الفروع والملغيات (@_orders.Count)</span>
+        </button>
+        <button class="audit-tab-btn @(_activeTab == "pnl" ? "active" : "")" @onclick='() => _activeTab = "pnl"'>
+            <MudIcon Icon="@Icons.Material.Rounded.QueryStats" Size="Size.Small" />
+            <span>قوائم الدخل اليومية (Daily P&L) (@_pnlList.Count)</span>
+        </button>
+        <button class="audit-tab-btn @(_activeTab == "batches" ? "active" : "")" @onclick='() => _activeTab = "batches"'>
+            <MudIcon Icon="@Icons.Material.Rounded.Layers" Size="Size.Small" />
+            <span>طبقات تكلفة المخزون (Cost Batches) (@_batchesList.Count)</span>
+        </button>
+    </div>
+
+    @if (_activeTab == "orders")
+    {
+        <!-- Orders Filter Toolbar -->
+        <div class="action-bar">
+            <div class="search-filter-box">
+                <div class="input-search-wrapper">
+                    <MudIcon Icon="@Icons.Material.Rounded.Search" Class="search-icon" />
+                    <input type="text" class="custom-search-input" placeholder="بحث برقم الطلب أو الطاولة أو العميل أو الكاشير..."
+                           @bind="_searchTerm" @bind:event="oninput" />
+                </div>
+
+                <select class="custom-select" @bind="_selectedBranchFilter">
+                    <option value="0">كل الفروع</option>
+                    @foreach (var b in SyncService.Branches)
+                    {
+                        <option value="@b.Id">@b.Name</option>
+                    }
+                </select>
+
+                <select class="custom-select" @bind="_selectedVoidFilter">
+                    <option value="all">كل الفواتير</option>
+                    <option value="voids_only">فواتير بها فويد وملغيات فقط</option>
+                    <option value="clean_only">فواتير سليمة فقط</option>
+                </select>
+            </div>
+
+            <div class="top-actions">
+                <button class="gold-action-btn" @onclick="ReloadData" disabled="@_isLoading">
+                    @if (_isLoading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="spinner-gold" />
+                        <span>جاري التحديث...</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Rounded.Refresh" Size="Size.Small" />
+                        <span>تحديث البيانات من السيرفر</span>
+                    }
+                </button>
+            </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="table-container">
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>رقم الطلب</th>
+                        <th>الفرع</th>
+                        <th>التاريخ والوقت</th>
+                        <th>النوع / الطاولة</th>
+                        <th>الكاشير / الخدمة</th>
+                        <th>طريقة الدفع</th>
+                        <th>الإجمالي</th>
+                        <th>الفويد / الملغى</th>
+                        <th>الأصناف</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_filteredOrders.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="10" class="empty-cell">
+                                <MudIcon Icon="@Icons.Material.Rounded.SearchOff" Size="Size.Large" Class="empty-icon" />
+                                <p>لا توجد فواتير مطابقة لمعايير البحث الحالية</p>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var order in _filteredOrders)
+                        {
+                            <tr class="@(order.HasVoid ? "row-has-void" : "")">
+                                <td>
+                                    <span class="order-id-badge">#@order.OrderId</span>
+                                </td>
+                                <td>
+                                    <strong>@order.BranchName</strong>
+                                </td>
+                                <td>
+                                    <span class="time-txt" dir="ltr">@order.OrderDate.ToString("yyyy-MM-dd hh:mm tt")</span>
+                                </td>
+                                <td>
+                                    <span class="type-pill">@order.OrderType</span>
+                                    @if (!string.IsNullOrWhiteSpace(order.TableName))
+                                    {
+                                        <small class="table-tag">@order.TableName</small>
+                                    }
+                                </td>
+                                <td>
+                                    <span>@order.CashierName</span>
+                                    @if (!string.IsNullOrWhiteSpace(order.WaiterName))
+                                    {
+                                        <small class="waiter-tag">· @order.WaiterName</small>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="pay-method-badge">@order.PaymentMethod</span>
+                                </td>
+                                <td>
+                                    <strong class="price-val">@order.GrandTotal.ToString("N1") ج.م</strong>
+                                </td>
+                                <td>
+                                    @if (order.HasVoid)
+                                    {
+                                        <span class="void-tag" title="@order.VoidReason">
+                                            <MudIcon Icon="@Icons.Material.Rounded.Warning" Size="Size.Small" />
+                                            @order.VoidAmount.ToString("N0") ج.م فويد
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="clean-tag">سليمة</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="items-count-pill">@order.Items.Count أصناف</span>
+                                </td>
+                                <td>
+                                    <button class="view-btn" @onclick="() => OpenOrderDetails(order)">
+                                        <MudIcon Icon="@Icons.Material.Rounded.Visibility" Size="Size.Small" />
+                                        <span>التفاصيل</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (_activeTab == "pnl")
+    {
+        <!-- Daily P&L Table (قوائم الدخل) -->
+        <div class="table-container">
+            <div class="tab-info-banner">
+                <MudIcon Icon="@Icons.Material.Rounded.Info" Size="Size.Small" />
+                <span>قوائم الدخل اليومية المسحوبة من الفروع (BranchDailyPnL) لحساب صافي وهوامش الربح الحقيقية</span>
+            </div>
+            <table class="audit-table pnl-table">
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>الفرع</th>
+                        <th>إجمالي المبيعات</th>
+                        <th>الخصومات</th>
+                        <th>الملغيات</th>
+                        <th>صافي المبيعات</th>
+                        <th>تكلفة البضاعة (COGS)</th>
+                        <th>الهالك (Waste)</th>
+                        <th>المصروفات النقدية</th>
+                        <th>مجمل الربح</th>
+                        <th>هامش الربح</th>
+                        <th>صافي الربح النهائي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pnl in _pnlList)
+                    {
+                        <tr>
+                            <td><strong dir="ltr">@pnl.Date.ToString("yyyy-MM-dd")</strong></td>
+                            <td>@pnl.BranchName</td>
+                            <td>@pnl.TotalGrossSales.ToString("N0") ج.م</td>
+                            <td class="text-danger">@pnl.TotalDiscounts.ToString("N0") ج.م</td>
+                            <td class="text-danger">@pnl.TotalVoids.ToString("N0") ج.م</td>
+                            <td><strong>@pnl.NetSales.ToString("N0") ج.م</strong></td>
+                            <td class="text-warning">@pnl.TotalCOGS.ToString("N0") ج.م</td>
+                            <td class="text-danger">@pnl.TotalWasteCost.ToString("N0") ج.م</td>
+                            <td class="text-warning">@pnl.TotalExpenses.ToString("N0") ج.م</td>
+                            <td class="gold-txt">@pnl.GrossProfit.ToString("N0") ج.م</td>
+                            <td><strong>@pnl.GrossProfitMargin.ToString("N1")%</strong></td>
+                            <td>
+                                <strong class="profit-highlight">@pnl.NetProfit.ToString("N0") ج.م</strong>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (_activeTab == "batches")
+    {
+        <!-- Cost Batches Table (طبقات تكلفة المخزون) -->
+        <div class="table-container">
+            <div class="tab-info-banner">
+                <MudIcon Icon="@Icons.Material.Rounded.Info" Size="Size.Small" />
+                <span>طبقات تكلفة المخزون وتوريدات الفروع ومشتريات الدرج (BranchInventoryCostBatch)</span>
+            </div>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>الفرع</th>
+                        <th>اسم الصنف / المادة الخام</th>
+                        <th>مصدر الطبقة</th>
+                        <th>رقم المرجع (Ref)</th>
+                        <th>الكمية الواردة</th>
+                        <th>الكمية المتبقية</th>
+                        <th>تكلفة الوحدة</th>
+                        <th>أولوية السحب</th>
+                        <th>حالة النفاذ</th>
+                        <th>تاريخ الاستلام</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var batch in _batchesList)
+                    {
+                        <tr>
+                            <td>فرع @batch.BranchId</td>
+                            <td><strong>@batch.ItemName</strong></td>
+                            <td>
+                                <span class="badge-source @(batch.BatchSource == "ExpensePurchase" ? "source-expense" : "source-transfer")">
+                                    @(batch.BatchSource == "ExpensePurchase" ? "شراء نقدي من الدرج" : "تحويل مخزن مركزي")
+                                </span>
+                            </td>
+                            <td><code dir="ltr">@batch.ReferenceId</code></td>
+                            <td>@batch.OriginalQuantity @batch.UnitName</td>
+                            <td><strong>@batch.RemainingQuantity @batch.UnitName</strong></td>
+                            <td>@batch.UnitCost.ToString("N2") ج.م</td>
+                            <td><span class="priority-tag">أولوية @batch.Priority</span></td>
+                            <td>
+                                @if (batch.IsExhausted)
+                                {
+                                    <span class="exhausted-badge">منفذة بالكامل</span>
+                                }
+                                else
+                                {
+                                    <span class="active-batch-badge">متاحة للصرف</span>
+                                }
+                            </td>
+                            <td><span dir="ltr">@batch.ReceivedAt.ToString("yyyy-MM-dd")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Order Detail Drawer / Modal -->
+@if (_selectedOrder != null)
+{
+    <div class="modal-overlay" @onclick="CloseDetails">
+        <div class="modal-dialog-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <div class="title-with-icon">
+                    <MudIcon Icon="@Icons.Material.Rounded.Receipt" Class="modal-gold-icon" />
+                    <div>
+                        <h2>تفاصيل الفاتورة #@_selectedOrder.OrderId - @_selectedOrder.BranchName</h2>
+                        <span class="modal-subtitle">@_selectedOrder.OrderDate.ToString("yyyy-MM-dd hh:mm tt") · نوع الطلب: @_selectedOrder.OrderType</span>
+                    </div>
+                </div>
+                <button class="close-modal-btn" @onclick="CloseDetails">
+                    <MudIcon Icon="@Icons.Material.Rounded.Close" />
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Void Alert Banner if order has void -->
+                @if (_selectedOrder.HasVoid)
+                {
+                    <div class="void-audit-banner">
+                        <div class="banner-icon">
+                            <MudIcon Icon="@Icons.Material.Rounded.ReportProblem" Size="Size.Large" />
+                        </div>
+                        <div class="banner-text">
+                            <h4>تنبيه فويد / ملغيات مسجلة على الفاتورة</h4>
+                            <p><strong>قيمة الفويد:</strong> @_selectedOrder.VoidAmount.ToString("N2") ج.م</p>
+                            <p><strong>المسؤول عن الفويد:</strong> @(string.IsNullOrWhiteSpace(_selectedOrder.VoidByName) ? "مدير الصالة" : _selectedOrder.VoidByName)</p>
+                            <p><strong>سبب الإلغاء:</strong> @(string.IsNullOrWhiteSpace(_selectedOrder.VoidReason) ? "لم يتم إدخال سبب" : _selectedOrder.VoidReason)</p>
+                            @if (_selectedOrder.VoidTime.HasValue)
+                            {
+                                <p><strong>توقيت الفويد:</strong> <span dir="ltr">@_selectedOrder.VoidTime.Value.ToString("yyyy-MM-dd hh:mm:ss tt")</span></p>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Order Meta Grid -->
+                <div class="order-meta-grid">
+                    <div class="meta-item">
+                        <span class="meta-label">الكاشير:</span>
+                        <span class="meta-val">@_selectedOrder.CashierName</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(_selectedOrder.WaiterName))
+                    {
+                        <div class="meta-item">
+                            <span class="meta-label">الويتر:</span>
+                            <span class="meta-val">@_selectedOrder.WaiterName</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_selectedOrder.TableName))
+                    {
+                        <div class="meta-item">
+                            <span class="meta-label">الطاولة:</span>
+                            <span class="meta-val">@_selectedOrder.TableName</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_selectedOrder.CustomerName))
+                    {
+                        <div class="meta-item">
+                            <span class="meta-label">العميل:</span>
+                            <span class="meta-val">@_selectedOrder.CustomerName (@_selectedOrder.Phone)</span>
+                        </div>
+                    }
+                    <div class="meta-item">
+                        <span class="meta-label">طريقة الدفع:</span>
+                        <span class="meta-val">@_selectedOrder.PaymentMethod</span>
+                    </div>
+                </div>
+
+                <!-- Items & Attributes List -->
+                <h3 class="section-title">أصناف الفاتورة والخصائص (Items & Attributes)</h3>
+                <div class="items-cards-list">
+                    @foreach (var item in _selectedOrder.Items)
+                    {
+                        <div class="item-card @(item.IsVoided ? "voided-item-card" : "")">
+                            <div class="item-card-top">
+                                <div class="item-name-box">
+                                    <h4>@item.ItemName</h4>
+                                    <span class="item-cat">@item.CategoryName</span>
+                                </div>
+                                <div class="item-pricing">
+                                    <span class="item-qty">@item.Quantity × @item.UnitPrice.ToString("N1") ج.م</span>
+                                    <strong class="item-total">@item.TotalAmount.ToString("N1") ج.م</strong>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(item.LineComment))
+                            {
+                                <div class="item-comment">
+                                    <MudIcon Icon="@Icons.Material.Rounded.Comment" Size="Size.Small" />
+                                    <span>ملاحظة التحضير: @item.LineComment</span>
+                                </div>
+                            }
+
+                            <!-- Attributes & Addons -->
+                            @if (item.Attributes.Count > 0)
+                            {
+                                <div class="item-attributes-cluster">
+                                    <span class="attr-cluster-label">الإضافات والخصائص:</span>
+                                    @foreach (var attr in item.Attributes)
+                                    {
+                                        <span class="attribute-pill">
+                                            @attr.AttributeName
+                                            @if (attr.ExtraPrice > 0)
+                                            {
+                                                <small dir="ltr">+@attr.ExtraPrice.ToString("N0") ج.م</small>
+                                            }
+                                        </span>
+                                    }
+                                </div>
+                            }
+
+                            <!-- Item-level void info -->
+                            @if (item.IsVoided)
+                            {
+                                <div class="item-void-pill">
+                                    <MudIcon Icon="@Icons.Material.Rounded.Cancel" Size="Size.Small" />
+                                    <span>تم إلغاء هذا الصنف: كمية @item.VoidQuantity بقيمة @item.TotalVoidAmount.ToString("N1") ج.م بواسطة @item.VoidByName (السبب: @item.VoidReason)</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <!-- Totals Breakdown -->
+                <div class="totals-breakdown-box">
+                    <div class="breakdown-row">
+                        <span>المجموع الفرعي:</span>
+                        <span>@_selectedOrder.Subtotal.ToString("N2") ج.م</span>
+                    </div>
+                    @if (_selectedOrder.Tax > 0)
+                    {
+                        <div class="breakdown-row">
+                            <span>ضريبة القيمة المضافة:</span>
+                            <span>@_selectedOrder.Tax.ToString("N2") ج.م</span>
+                        </div>
+                    }
+                    @if (_selectedOrder.Service > 0)
+                    {
+                        <div class="breakdown-row">
+                            <span>خدمة الصالة:</span>
+                            <span>@_selectedOrder.Service.ToString("N2") ج.م</span>
+                        </div>
+                    }
+                    @if (_selectedOrder.DeliveryFees > 0)
+                    {
+                        <div class="breakdown-row">
+                            <span>رسوم التوصيل:</span>
+                            <span>@_selectedOrder.DeliveryFees.ToString("N2") ج.م</span>
+                        </div>
+                    }
+                    @if (_selectedOrder.TotalDiscount > 0)
+                    {
+                        <div class="breakdown-row text-danger">
+                            <span>إجمالي الخصم (@_selectedOrder.DiscountReason):</span>
+                            <span>-@_selectedOrder.TotalDiscount.ToString("N2") ج.م</span>
+                        </div>
+                    }
+                    <div class="breakdown-row grand-total-row">
+                        <span>الإجمالي النهائي المستحق:</span>
+                        <strong>@_selectedOrder.GrandTotal.ToString("N2") ج.م</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="gold-action-btn" @onclick="CloseDetails">إغلاق النافذة</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _activeTab = "orders";
+    private string _searchTerm = "";
+    private string _selectedBranchFilter = "0";
+    private string _selectedVoidFilter = "all";
+    private bool _isLoading = false;
+
+    private List<HqOrderAuditDto> _orders = new();
+    private List<HqDailyPnLDto> _pnlList = new();
+    private List<HqCostBatchDto> _batchesList = new();
+    private HqOrderAuditDto? _selectedOrder;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllData();
+    }
+
+    private async Task LoadAllData()
+    {
+        _isLoading = true;
+        try
+        {
+            _orders = await SyncService.GetOrderAuditListAsync();
+            _pnlList = await SyncService.GetDailyPnLListAsync();
+            _batchesList = await SyncService.GetCostBatchesAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"حدث خطأ أثناء تحميل البيانات: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ReloadData()
+    {
+        await LoadAllData();
+        Snackbar.Add("تم تحديث البيانات بالكامل", Severity.Success);
+    }
+
+    private List<HqOrderAuditDto> _filteredOrders
+    {
+        get
+        {
+            return _orders.Where(o =>
+            {
+                if (!string.IsNullOrWhiteSpace(_searchTerm))
+                {
+                    var term = _searchTerm.Trim();
+                    var match = o.OrderId.ToString().Contains(term) ||
+                                o.BranchName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                                (o.CashierName != null && o.CashierName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                                (o.CustomerName != null && o.CustomerName.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                                (o.TableName != null && o.TableName.Contains(term, StringComparison.OrdinalIgnoreCase));
+                    if (!match) return false;
+                }
+
+                if (int.TryParse(_selectedBranchFilter, out int bId) && bId > 0)
+                {
+                    if (o.BranchId != bId) return false;
+                }
+
+                if (_selectedVoidFilter == "voids_only" && !o.HasVoid) return false;
+                if (_selectedVoidFilter == "clean_only" && o.HasVoid) return false;
+
+                return true;
+            }).ToList();
+        }
+    }
+
+    private void OpenOrderDetails(HqOrderAuditDto order)
+    {
+        _selectedOrder = order;
+    }
+
+    private void CloseDetails()
+    {
+        _selectedOrder = null;
+    }
+}

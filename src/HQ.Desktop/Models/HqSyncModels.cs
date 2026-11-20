@@ -110,3 +110,117 @@ public sealed class HqTopProductMetric
     public string TopSellingBranch { get; set; } = string.Empty;
     public double GrowthPercentage { get; set; }
 }
+
+public sealed class HqOrderAuditDto
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public int BranchId { get; set; }
+    public string BranchName { get; set; } = "الفرع الرئيسي";
+    public DateTime OrderDate { get; set; }
+    public string OrderType { get; set; } = "صالة";
+    public string OrderState { get; set; } = "مكتمل";
+    public decimal Subtotal { get; set; }
+    public decimal Tax { get; set; }
+    public decimal Service { get; set; }
+    public decimal DeliveryFees { get; set; }
+    public decimal TotalDiscount { get; set; }
+    public decimal GrandTotal { get; set; }
+    public decimal Paid { get; set; }
+    public decimal Remain { get; set; }
+    public string? CashierName { get; set; }
+    public string? WaiterName { get; set; }
+    public string? DriverName { get; set; }
+    public string? CustomerName { get; set; }
+    public string? Phone { get; set; }
+    public string? TableName { get; set; }
+    public string? PaymentMethod { get; set; }
+    public bool HasVoid { get; set; }
+    public decimal VoidAmount { get; set; }
+    public string? VoidByName { get; set; }
+    public string? VoidReason { get; set; }
+    public DateTime? VoidTime { get; set; }
+    public string? DiscountReason { get; set; }
+    public string? DiscountByName { get; set; }
+    public bool IsHospitality { get; set; }
+    public bool IsStaffMeal { get; set; }
+    public string? OrderNotice { get; set; }
+    public List<HqOrderItemAuditDto> Items { get; set; } = new();
+}
+
+public sealed class HqOrderItemAuditDto
+{
+    public int Id { get; set; }
+    public string ItemName { get; set; } = string.Empty;
+    public string? CategoryName { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public string? DiscountReason { get; set; }
+    public bool IsVoided { get; set; }
+    public decimal VoidQuantity { get; set; }
+    public decimal TotalVoidAmount { get; set; }
+    public string? VoidByName { get; set; }
+    public string? VoidReason { get; set; }
+    public DateTime? VoidTime { get; set; }
+    public string? LineComment { get; set; }
+    public List<HqOrderItemAttributeDto> Attributes { get; set; } = new();
+}
+
+public sealed class HqOrderItemAttributeDto
+{
+    public string AttributeName { get; set; } = string.Empty;
+    public decimal ExtraPrice { get; set; }
+}
+
+public sealed class HqDailyPnLDto
+{
+    public DateTime Date { get; set; }
+    public int BranchId { get; set; }
+    public string BranchName { get; set; } = string.Empty;
+    public decimal TotalGrossSales { get; set; }
+    public decimal TotalDiscounts { get; set; }
+    public decimal TotalVoids { get; set; }
+    public decimal NetSales { get; set; }
+    public decimal TotalCOGS { get; set; }
+    public decimal TotalWasteCost { get; set; }
+    public decimal TotalInventoryPurchases { get; set; }
+    public decimal GrossProfit { get; set; }
+    public decimal GrossProfitMargin { get; set; }
+    public decimal TotalExpenses { get; set; }
+    public decimal NetProfit { get; set; }
+    public int OrderCount { get; set; }
+    public DateTime CalculatedAt { get; set; }
+}
+
+public sealed class HqCostBatchDto
+{
+    public int BranchId { get; set; }
+    public int MenuSalesItemId { get; set; }
+    public string ItemName { get; set; } = string.Empty;
+    public string BatchSource { get; set; } = string.Empty;
+    public string ReferenceId { get; set; } = string.Empty;
+    public decimal OriginalQuantity { get; set; }
+    public decimal RemainingQuantity { get; set; }
+    public decimal UnitCost { get; set; }
+    public string? UnitName { get; set; }
+    public int Priority { get; set; }
+    public bool IsExhausted { get; set; }
+    public DateTime ReceivedAt { get; set; }
+}
+
+public sealed class HqSyncMetricsReport
+{
+    public int TotalOrdersSynced { get; set; }
+    public int TotalOrderItemsSynced { get; set; }
+    public int TotalAttributesSynced { get; set; }
+    public int TotalVoidsSynced { get; set; }
+    public int TotalRequisitionsSynced { get; set; }
+    public int TotalPnLSnapshotsSynced { get; set; }
+    public int TotalCostBatchesSynced { get; set; }
+    public int TotalExpensesSynced { get; set; }
+    public decimal TotalSalesValueSynced { get; set; }
+    public decimal TotalVoidValueSynced { get; set; }
+    public DateTime LastSyncTimestamp { get; set; } = DateTime.Now;
+}

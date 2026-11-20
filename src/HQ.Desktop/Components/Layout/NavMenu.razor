@@ -29,6 +29,11 @@
             <span>إعدادات الفروع</span>
         </button>
 
+        <button class="nav-link @(IsActive("/orders-audit") ? "active" : "")" title="تدقيق الفواتير والملغيات وقوائم الدخل" @onclick='() => NavigateTo("/orders-audit")'>
+            <MudIcon Icon="@Icons.Material.Rounded.ReceiptLong" />
+            <span>تدقيق الفواتير والملغيات</span>
+        </button>
+
         <button class="nav-link @(IsActive("/warehouses-settings") ? "active" : "")" title="إعدادات المخازن الرئيسية" @onclick='() => NavigateTo("/warehouses-settings")'>
             <MudIcon Icon="@Icons.Material.Rounded.Warehouse" />
             <span>المخازن الرئيسية</span>
